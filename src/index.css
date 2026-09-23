@@ -39,7 +39,7 @@
   --grad-disk: linear-gradient(90deg, oklch(0.65 0.16 160), oklch(0.75 0.16 130));
   --grad-net: linear-gradient(90deg, oklch(0.72 0.16 75), oklch(0.68 0.18 45));
   --grad-danger: linear-gradient(90deg, oklch(0.6 0.22 25), oklch(0.68 0.2 50));
-  /* 热力色阶：12 小时色块逐档取样，低饱和但小尺寸下档位分明 */
+  /* 热力色阶：24 小时色块逐档取样，低饱和但小尺寸下档位分明 */
   --heat-ok: oklch(0.8 0.12 165);
   --heat-mild: oklch(0.84 0.13 125);
   --heat-warn: oklch(0.86 0.14 95);
@@ -202,10 +202,15 @@
   .bar-net { background-image: var(--grad-net); }
   .bar-danger { background-image: var(--grad-danger); }
 
-  /* 12 小时热力色块：每格一枚小圆角方块，顶部高光 + 底部浅投影做出微凸质感；
-     没有数据的格子反过来凹陷留白，随时段保留完整轨道 */
+  /* 24 小时热力色块：每格一枚小圆角方块，顶部高光 + 底部浅投影做出微凸质感，
+     悬停轻微抬起；没有数据的格子反过来凹陷留白，随时段保留完整轨道 */
   .heat-cell {
-    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.45), 0 1px 2px oklch(0.35 0.03 275 / 0.18);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.4), 0 1px 1.5px oklch(0.35 0.03 275 / 0.16);
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  .heat-cell:hover {
+    transform: translateY(-1px);
+    filter: saturate(1.08) brightness(1.03);
   }
   .heat-ok {
     background-color: var(--heat-ok);
@@ -230,6 +235,10 @@
   .heat-muted {
     background-color: var(--heat-muted);
     box-shadow: inset 0 1px 3px oklch(0.35 0.03 275 / 0.18);
+  }
+  .heat-muted:hover {
+    transform: none;
+    filter: none;
   }
   .dark .heat-cell {
     box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14), 0 1px 2px oklch(0 0 0 / 0.45);

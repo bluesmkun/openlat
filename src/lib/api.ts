@@ -229,7 +229,7 @@ export type Latency = {
   probe: string
   jitter: number | null
   probes: ProbeStat[]
-  /** 所有探测按小时聚合后的单条 12 小时序列 */
+  /** 所有探测按小时聚合后的单条 24 小时序列 */
   hours: LatencyHour[]
   avgLatency: number | null
   avgLoss: number | null
@@ -247,10 +247,10 @@ function jitterOf(values: (number | null)[]): number | null {
   return sum / (clean.length - 1)
 }
 
-export const HOUR_BUCKETS = 12
+export const HOUR_BUCKETS = 24
 const HOUR_SECONDS = 3600
 
-/** 12 个小时桶的时间戳，最后一格是当前小时。 */
+/** 24 个小时桶的时间戳，最后一格是当前小时。 */
 function hourSlots(count = HOUR_BUCKETS): number[] {
   const nowHour = Math.floor(Date.now() / 1000 / HOUR_SECONDS) * HOUR_SECONDS
   return Array.from({ length: count }, (_, i) => nowHour - (count - 1 - i) * HOUR_SECONDS)
@@ -279,7 +279,7 @@ function hourlyBuckets(points: PingPoint[], fallbackLoss: number, slots: number[
   })
 }
 
-/** 把多个探测按小时求均值，合成单条 12 小时序列。 */
+/** 把多个探测按小时求均值，合成单条 24 小时序列。 */
 export function mergeHours(probes: ProbeStat[], slots: number[]): LatencyHour[] {
   return slots.map((ts, i) => {
     let latSum = 0
@@ -393,7 +393,7 @@ export function useLatency(nodes: Node[] | null): LatencyMap {
       while (running < CONCURRENCY && queue.length > 0) {
         const id = queue.shift()!
         running++
-        fetchHistory(id, 12, "ping", 144)
+        fetchHistory(id, 24, "ping", 288)
           .then((history) => {
             if (!stopped) setStats((s) => ({ ...s, [id]: summarizePing(history) }))
           })

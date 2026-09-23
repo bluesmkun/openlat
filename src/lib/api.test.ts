@@ -82,19 +82,19 @@ const hourly = summarizePing(history([
   { task_id: 1, ts: hour + 10, latency: 40 },
   { task_id: 1, ts: hour + 20, latency: 60 },
 ]))
-assert.equal(hourly.probes[0].hours.length, 12)
-assert.equal(hourly.probes[0].hours[11].latency, 50)
-assert.equal(hourly.probes[0].hours[11].loss, 0)
+assert.equal(hourly.probes[0].hours.length, 24)
+assert.equal(hourly.probes[0].hours[23].latency, 50)
+assert.equal(hourly.probes[0].hours[23].loss, 0)
 assert.equal(hourly.probes[0].hours[0].latency, null)
 assert.equal(hourly.probes[0].avgLatency, 50)
 
 const hourlyLoss = summarizePing(history([
   { task_id: 2, ts: hour + 10, latency: 50, loss: 8 },
 ], { "2": 8 }))
-assert.equal(hourlyLoss.probes[0].hours[11].loss, 8)
+assert.equal(hourlyLoss.probes[0].hours[23].loss, 8)
 assert.equal(hourlyLoss.probes[0].avgLoss, 8)
 
-console.log("小时聚合生成 12 格波形数据")
+console.log("小时聚合生成 24 格热力数据")
 
 const merged = summarizePing(history([
   { task_id: 1, ts: hour + 10, latency: 40 },
@@ -102,8 +102,8 @@ const merged = summarizePing(history([
   { task_id: 2, ts: hour + 10, latency: 120 },
   { task_id: 2, ts: hour + 20, latency: 80 },
 ]))
-assert.equal(merged.hours.length, 12)
-assert.equal(merged.hours[11].latency, 75)
+assert.equal(merged.hours.length, 24)
+assert.equal(merged.hours[23].latency, 75)
 assert.equal(merged.hours[0].latency, null)
 assert.equal(merged.avgLatency, 75)
 assert.equal(merged.avgLoss, 0)
@@ -121,5 +121,5 @@ const gap = mergeHours([probe([slot(null, 6)])], [hour])
 assert.equal(gap[0].latency, null)
 assert.equal(gap[0].loss, 6)
 
-console.log("多探测按小时均值合并为单条波形")
+console.log("多探测按小时均值合并为单条热力轨道")
 

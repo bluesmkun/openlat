@@ -216,8 +216,8 @@ const HEAT_BLOCKS: Record<Heat, string> = {
   muted: "heat-muted",
 }
 
-/** 12 小时热力色块：每小时一格圆角方块，延迟与丢包各自一条轨道；
- *  色块带微拟物的高光与投影，没有数据的格子凹陷留白 */
+/** 24 小时热力色块：每小时一格小圆角方块，延迟与丢包各自一条轨道，
+ *  每 6 格留一道空隙区分时段；色块带微拟物的高光与投影，没有数据的格子凹陷留白 */
 function HeatTrack({
   hours,
   kind,
@@ -231,9 +231,10 @@ function HeatTrack({
   compact?: boolean
   className?: string
 }) {
-  const cell = cn("heat-cell min-w-0 flex-1", compact ? "rounded-[3px]" : "rounded-[5px]")
+  const cell = cn("heat-cell min-w-0 flex-1", compact ? "rounded-[2px]" : "rounded-[3px]")
+  const gap = (i: number) => (i > 0 && i % 6 === 0 ? (compact ? "ml-[2px]" : "ml-[3px]") : "")
   return (
-    <span className={cn("flex min-w-0 items-stretch", compact ? "gap-[2px]" : "gap-1", className)}>
+    <span className={cn("flex min-w-0 items-stretch", compact ? "gap-[1px]" : "gap-[1.5px]", className)}>
       {hours.length > 0
         ? hours.map((hour, i) => {
             const value = kind === "latency" ? hour.latency : hour.loss
@@ -243,13 +244,13 @@ function HeatTrack({
                 title={`${hourLabel(hour.ts)} · ${TRACK[kind]} ${
                   value === null ? "无数据" : kind === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`
                 }${probes > 1 ? `（${probes} 个探测均值）` : ""}`}
-                className={cn(cell, HEAT_BLOCKS[heatOf(value, kind)])}
+                className={cn(cell, gap(i), HEAT_BLOCKS[heatOf(value, kind)])}
               />
             )
           })
-        : // 没有探测数据时也铺满 12 格空槽，卡片行高与有数据的节点完全一致
+        : // 没有探测数据时也铺满 24 格空槽，卡片行高与有数据的节点完全一致
           Array.from({ length: HOUR_BUCKETS }, (_, i) => (
-            <span key={i} className={cn(cell, HEAT_BLOCKS.muted)} />
+            <span key={i} className={cn(cell, gap(i), HEAT_BLOCKS.muted)} />
           ))}
     </span>
   )
@@ -268,7 +269,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Activity className="size-3.5" />
-          12 小时
+          24 小时
         </span>
         <span
           className="tnum shrink-0 truncate text-[10px] text-muted-foreground"
@@ -293,7 +294,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
       <div className="mt-2 space-y-1.5">
         <div className="flex items-center gap-2">
           <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">延迟</span>
-          <HeatTrack hours={hours} kind="latency" probes={probes.length} className="h-5 min-w-0 flex-1" />
+          <HeatTrack hours={hours} kind="latency" probes={probes.length} className="h-2.5 min-w-0 flex-1" />
           <span
             className={cn(
               "tnum w-12 shrink-0 text-right text-[10px] leading-none",
@@ -305,7 +306,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
         </div>
         <div className="flex items-center gap-2">
           <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">丢包</span>
-          <HeatTrack hours={hours} kind="loss" probes={probes.length} className="h-5 min-w-0 flex-1" />
+          <HeatTrack hours={hours} kind="loss" probes={probes.length} className="h-2.5 min-w-0 flex-1" />
           <span
             className={cn(
               "tnum w-12 shrink-0 text-right text-[10px] leading-none",
@@ -318,7 +319,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
       </div>
 
       <div className="mt-1 flex items-center justify-between pl-9 pr-14 text-[9px] text-muted-foreground/50">
-        <span>12 小时前</span>
+        <span>24 小时前</span>
         <span>现在</span>
       </div>
     </div>
@@ -333,8 +334,8 @@ export function LatencyMini({ latency, className }: { latency?: Latency; classNa
   return (
     <span className={cn("flex min-w-0 flex-col justify-center gap-1", className)}>
       {/* 与卡片视图同一份 hours（多探测按小时求均值）与同一个热力色块组件，两个视图显示一致 */}
-      <HeatTrack hours={hours} kind="latency" probes={probes.length} compact className="h-2.5" />
-      <HeatTrack hours={hours} kind="loss" probes={probes.length} compact className="h-2.5" />
+      <HeatTrack hours={hours} kind="latency" probes={probes.length} compact className="h-2" />
+      <HeatTrack hours={hours} kind="loss" probes={probes.length} compact className="h-2" />
       <span className="flex min-w-0 items-center justify-between gap-2 text-[10px] leading-none whitespace-nowrap">
         <span className={cn("tnum truncate", TONE_TEXT[best.tone])}>{best.text}</span>
         <span className={cn("tnum shrink-0", HEAT_TEXT[heatOf(avgLoss, "loss")])}>
