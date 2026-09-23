@@ -106,7 +106,8 @@ function NodeMapBase({
           {mapped} 个节点 · {places.length} 个地区
         </span>
       </div>
-      <div className="relative mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-muted-foreground">
+      {/* pl-8 让状态文字与上一行标题的左缘（图标 24px + 间距 8px）对齐 */}
+      <div className="relative mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-8 text-[10px] text-muted-foreground">
         <span className="tnum">
           在线 <span className="text-ok">{online}</span>
           {offline > 0 && (
@@ -115,7 +116,7 @@ function NodeMapBase({
             </>
           )}
         </span>
-        <span className="ml-auto flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="ml-auto flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
           {LEGEND.map((item) => (
             <span key={item.tone} className="inline-flex items-center gap-1">
               <span className={cn("size-1.5 shrink-0 rounded-full bg-current", DOT_TEXT[item.tone])} />
