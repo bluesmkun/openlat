@@ -108,8 +108,10 @@ export function Summary({
   const spend = monthlySpend(nodes)
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      <div className="grid grid-cols-2 gap-3">
+    /* 和下方节点卡片共用同一套列模板：概览牌各占一个节点卡宽度，
+       地图占两个，横向边缘逐列对齐 */
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:col-span-2 xl:col-span-2 2xl:col-span-2">
         <Tile icon={Database} label="本月流量" tone="primary">
           <div className="tnum text-xl font-semibold">
             {nodes.length > 0 ? bytes(monthTotal) : "—"}
@@ -162,7 +164,7 @@ export function Summary({
           </div>
         </Tile>
       </div>
-      <NodeMap nodes={nodes} onOpen={onOpen} />
+      <NodeMap nodes={nodes} onOpen={onOpen} className="sm:col-span-2 xl:col-span-1 2xl:col-span-2" />
     </div>
   )
 }

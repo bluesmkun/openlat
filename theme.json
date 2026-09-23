@@ -2,7 +2,7 @@
   "name": "openlat",
   "short": "openlat",
   "description": "24 小时延迟 / 丢包热力状态页：卡片与列表双视图，性能、流量、费用、到期、TCP 与地区一屏尽览，支持搜索和分组",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "author": "bluesmkun",
   "url": "https://github.com/bluesmkun/openlat"
 }
