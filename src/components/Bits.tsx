@@ -196,15 +196,6 @@ function heatOf(value: number | null, kind: "latency" | "loss"): Heat {
   return value < 0.5 ? "ok" : value < 2 ? "mild" : value < 5 ? "warn" : value < 10 ? "hot" : "bad"
 }
 
-const WAVE_TONE: Record<Heat, string> = {
-  ok: "wave-ok",
-  mild: "wave-mild",
-  warn: "wave-warn",
-  hot: "wave-hot",
-  bad: "wave-bad",
-  muted: "wave-muted",
-}
-
 function hourLabel(ts: number): string {
   return new Date(ts * 1000).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit" })
 }
@@ -231,26 +222,26 @@ function waveLine(points: Pt[]): string {
   return d
 }
 
-/** 12 小时延迟 / 丢包波形。卡片与列表共用同一个组件、同一份 hours：
- *  延迟是渐变面积曲线，丢包是从基线长出的热力竖条，缺口如实断开，
- *  趋势与量级一眼可见，也更贴合整体的轻拟物语言 */
-function LatencyWave({
+const W = 100
+
+const slotX = (i: number, count: number) => (count <= 1 ? W / 2 : (i * W) / (count - 1))
+
+/** 12 小时延迟曲线：冷色渐变面积波，单独一条轨道，缺口如实断开，
+ *  末格没有数据时以虚线标出「现在」 */
+function LatencyCurve({
   hours,
-  tone,
   probes,
   compact = false,
   className,
 }: {
   hours: LatencyHour[]
-  tone: Heat
   probes: number
   compact?: boolean
   className?: string
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
-  const H = compact ? 20 : 44
-  const W = 100
-  const padY = compact ? 3 : 5
+  const H = compact ? 14 : 36
+  const padY = compact ? 2 : 4
   const step = W / Math.max(hours.length, 1)
   const values = hours.map((h) => h.latency)
   const clean = values.filter((v): v is number => v !== null)
@@ -259,7 +250,6 @@ function LatencyWave({
   const margin = Math.max((hi - lo) * 0.18, hi * 0.05, 1)
   const yMin = Math.max(0, lo - margin)
   const yMax = hi + margin
-  const px = (i: number) => (hours.length <= 1 ? W / 2 : (i * W) / (hours.length - 1))
   const py = (v: number) => clamp(H - padY - ((v - yMin) / Math.max(yMax - yMin, 1)) * (H - padY * 2), padY, H - padY)
 
   const segments: Pt[][] = []
@@ -269,34 +259,29 @@ function LatencyWave({
       if (run.length > 0) segments.push(run)
       run = []
     } else {
-      run.push({ x: px(i), y: py(v) })
+      run.push({ x: slotX(i, values.length), y: py(v) })
     }
   })
   if (run.length > 0) segments.push(run)
 
   const last = segments.length > 0 ? segments[segments.length - 1] : null
   const lastPt = last ? last[last.length - 1] : null
-  const maxBar = (H - padY) * (compact ? 0.55 : 0.45)
 
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none"
       aria-hidden
-      className={cn(WAVE_TONE[tone], "block w-full", className)}
+      className={cn("wave-cool block w-full", className)}
     >
       <defs>
-        <linearGradient id={`wave-stroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id={`lat-stroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" style={{ stopColor: "var(--wave-a)" }} />
           <stop offset="100%" style={{ stopColor: "var(--wave-b)" }} />
         </linearGradient>
-        <linearGradient id={`wave-fill-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
-          <stop offset="0%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.26 }} />
+        <linearGradient id={`lat-fill-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
+          <stop offset="0%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.3 }} />
           <stop offset="100%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.02 }} />
-        </linearGradient>
-        <linearGradient id={`wave-loss-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1={H} x2="0" y2="0">
-          <stop offset="0%" style={{ stopColor: "var(--heat-hot)", stopOpacity: 0.45 }} />
-          <stop offset="100%" style={{ stopColor: "var(--heat-bad)", stopOpacity: 0.9 }} />
         </linearGradient>
       </defs>
 
@@ -311,20 +296,6 @@ function LatencyWave({
         vectorEffect="non-scaling-stroke"
       />
 
-      {hours.map((hour, i) =>
-        hour.loss !== null && hour.loss > 0 ? (
-          <rect
-            key={i}
-            x={px(i) - step * 0.26}
-            y={H - Math.max(1.2, Math.min(hour.loss / 10, 1) * maxBar)}
-            width={step * 0.52}
-            height={Math.max(1.2, Math.min(hour.loss / 10, 1) * maxBar)}
-            rx="0.5"
-            fill={`url(#wave-loss-${uid})`}
-          />
-        ) : null,
-      )}
-
       {segments.map((points, i) => {
         const d = waveLine(points)
         if (points.length === 1) {
@@ -337,7 +308,7 @@ function LatencyWave({
               width="1.8"
               height="1.8"
               rx="0.9"
-              fill={`url(#wave-stroke-${uid})`}
+              fill={`url(#lat-stroke-${uid})`}
             />
           )
         }
@@ -345,12 +316,12 @@ function LatencyWave({
           <g key={i}>
             <path
               d={`${d} L ${points[points.length - 1].x} ${H} L ${points[0].x} ${H} Z`}
-              fill={`url(#wave-fill-${uid})`}
+              fill={`url(#lat-fill-${uid})`}
             />
             <path
               d={d}
               fill="none"
-              stroke={`url(#wave-stroke-${uid})`}
+              stroke={`url(#lat-stroke-${uid})`}
               strokeWidth="4"
               strokeOpacity="0.16"
               strokeLinecap="round"
@@ -360,7 +331,7 @@ function LatencyWave({
             <path
               d={d}
               fill="none"
-              stroke={`url(#wave-stroke-${uid})`}
+              stroke={`url(#lat-stroke-${uid})`}
               strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -385,13 +356,11 @@ function LatencyWave({
       )}
 
       {hours.map((hour, i) => (
-        <rect key={i} x={px(i) - step / 2} y="0" width={step} height={H} fill="transparent" pointerEvents="all">
+        <rect key={i} x={slotX(i, hours.length) - step / 2} y="0" width={step} height={H} fill="transparent" pointerEvents="all">
           <title>
             {`${hourLabel(hour.ts)} · 延迟 ${
               hour.latency === null ? "无数据" : `${Math.round(hour.latency)} ms`
-            } · 丢包 ${hour.loss === null ? "无数据" : `${hour.loss.toFixed(1)}%`}${
-              probes > 1 ? `（${probes} 个探测均值）` : ""
-            }`}
+            }${probes > 1 ? `（${probes} 个探测均值）` : ""}`}
           </title>
         </rect>
       ))}
@@ -399,11 +368,76 @@ function LatencyWave({
   )
 }
 
-function HeatStat({ label, value, tone }: { label: string; value: string; tone: string }) {
+/** 12 小时丢包竖条：暖色单独一条轨道，与冷色延迟曲线在颜色和形态上都不同，
+ *  两者不会再混在一起 */
+function LossBars({
+  hours,
+  probes,
+  compact = false,
+  className,
+}: {
+  hours: LatencyHour[]
+  probes: number
+  compact?: boolean
+  className?: string
+}) {
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
+  const H = compact ? 10 : 16
+  const padTop = compact ? 1.5 : 2.5
+  const step = W / Math.max(hours.length, 1)
+  const maxBar = H - padTop - 0.5
+
   return (
-    <span>
-      {label} <span className={tone}>{value}</span>
-    </span>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      aria-hidden
+      className={cn("block w-full", className)}
+    >
+      <defs>
+        <linearGradient id={`loss-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1={H} x2="0" y2="0">
+          <stop offset="0%" style={{ stopColor: "var(--heat-hot)", stopOpacity: 0.5 }} />
+          <stop offset="100%" style={{ stopColor: "var(--heat-bad)", stopOpacity: 0.95 }} />
+        </linearGradient>
+      </defs>
+
+      <line
+        x1="0"
+        y1={H - 0.5}
+        x2={W}
+        y2={H - 0.5}
+        className="stroke-border"
+        strokeWidth="1"
+        opacity="0.7"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      {hours.map((hour, i) => {
+        if (hour.loss === null || hour.loss <= 0) return null
+        const bar = Math.max(1.2, Math.min(hour.loss / 10, 1) * maxBar)
+        return (
+          <rect
+            key={i}
+            x={slotX(i, hours.length) - step * 0.27}
+            y={H - bar}
+            width={step * 0.54}
+            height={bar}
+            rx="0.5"
+            fill={`url(#loss-${uid})`}
+          />
+        )
+      })}
+
+      {hours.map((hour, i) => (
+        <rect key={i} x={slotX(i, hours.length) - step / 2} y="0" width={step} height={H} fill="transparent" pointerEvents="all">
+          <title>
+            {`${hourLabel(hour.ts)} · 丢包 ${hour.loss === null ? "无数据" : `${hour.loss.toFixed(1)}%`}${
+              probes > 1 ? `（${probes} 个探测均值）` : ""
+            }`}
+          </title>
+        </rect>
+      ))}
+    </svg>
   )
 }
 
@@ -420,41 +454,58 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Activity className="size-3.5" />
-          <span className="text-[10px] font-normal text-muted-foreground/60">12 小时 · 1H · TCP</span>
+          12 小时
         </span>
         <span
-          className={cn(
-            "shrink-0 text-[10px]",
-            failed ? "text-destructive" : "tnum text-muted-foreground",
-          )}
+          className="tnum shrink-0 truncate text-[10px] text-muted-foreground"
           title={failed ? undefined : probes.map((p) => p.name).join("、")}
         >
-          {failed ? "读取失败" : probes.length > 0 ? `${probes.length} 个探测` : ""}
+          {failed ? (
+            <span className="text-destructive">读取失败</span>
+          ) : (
+            <>
+              {jitter !== null && (
+                <>
+                  <span className={TONE_TEXT[jitterTone(jitter)]}>波动 {Math.round(jitter)}ms</span>
+                  {probes.length > 0 && " · "}
+                </>
+              )}
+              {probes.length > 0 && `${probes.length} 个探测`}
+            </>
+          )}
         </span>
       </div>
-      <div className="mt-2">
-        <LatencyWave hours={hours} tone={failed ? "muted" : heatOf(avgLatency, "latency")} probes={probes.length} className="h-11" />
-        <div className="mt-0.5 flex items-center justify-between text-[9px] text-muted-foreground/50">
-          <span>12 小时前</span>
-          <span>现在</span>
+
+      <div className="mt-2 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">延迟</span>
+          <LatencyCurve hours={hours} probes={probes.length} className="h-9 min-w-0 flex-1" />
+          <span
+            className={cn(
+              "tnum w-12 shrink-0 text-right text-[10px] leading-none",
+              HEAT_TEXT[heatOf(avgLatency, "latency")],
+            )}
+          >
+            {avgLatency === null ? "—" : `${Math.round(avgLatency)}ms`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">丢包</span>
+          <LossBars hours={hours} probes={probes.length} className="h-4 min-w-0 flex-1" />
+          <span
+            className={cn(
+              "tnum w-12 shrink-0 text-right text-[10px] leading-none",
+              HEAT_TEXT[heatOf(avgLoss, "loss")],
+            )}
+          >
+            {avgLoss === null ? "—" : `${avgLoss.toFixed(1)}%`}
+          </span>
         </div>
       </div>
-      <div className="tnum mt-1.5 flex min-w-0 items-center gap-2 truncate text-[10px] text-muted-foreground">
-        <HeatStat
-          label="延迟"
-          tone={HEAT_TEXT[heatOf(avgLatency, "latency")]}
-          value={avgLatency === null ? "—" : `${Math.round(avgLatency)}ms`}
-        />
-        <HeatStat
-          label="波动"
-          tone={TONE_TEXT[jitterTone(jitter)]}
-          value={jitter === null ? "—" : `${Math.round(jitter)}ms`}
-        />
-        <HeatStat
-          label="丢包"
-          tone={HEAT_TEXT[heatOf(avgLoss, "loss")]}
-          value={avgLoss === null ? "—" : `${avgLoss.toFixed(1)}%`}
-        />
+
+      <div className="mt-1 flex items-center justify-between pl-9 pr-14 text-[9px] text-muted-foreground/50">
+        <span>12 小时前</span>
+        <span>现在</span>
       </div>
     </div>
   )
@@ -466,15 +517,10 @@ export function LatencyMini({ latency, className }: { latency?: Latency; classNa
   const probes = latency?.probes ?? []
   const avgLoss = latency?.avgLoss ?? null
   return (
-    <span className={cn("flex min-w-0 flex-col justify-center gap-1.5", className)}>
-      {/* 与卡片视图同一份 hours（多探测按小时求均值）与同一个 LatencyWave，两个视图显示一致 */}
-      <LatencyWave
-        hours={hours}
-        tone={latency?.failed ? "muted" : heatOf(latency?.avgLatency ?? null, "latency")}
-        probes={probes.length}
-        compact
-        className="h-5"
-      />
+    <span className={cn("flex min-w-0 flex-col justify-center gap-1", className)}>
+      {/* 与卡片视图同一份 hours（多探测按小时求均值）与同一对组件，两个视图显示一致 */}
+      <LatencyCurve hours={hours} probes={probes.length} compact className="h-3.5" />
+      <LossBars hours={hours} probes={probes.length} compact className="h-2.5" />
       <span className="flex min-w-0 items-center justify-between gap-2 text-[10px] leading-none whitespace-nowrap">
         <span className={cn("tnum truncate", TONE_TEXT[best.tone])}>{best.text}</span>
         <span className={cn("tnum shrink-0", HEAT_TEXT[heatOf(avgLoss, "loss")])}>

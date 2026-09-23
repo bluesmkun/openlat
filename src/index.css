@@ -202,14 +202,9 @@
   .bar-net { background-image: var(--grad-net); }
   .bar-danger { background-image: var(--grad-danger); }
 
-  /* 延迟波形按严重度换一组渐变：曲线起点 → 终点、面积填充色三个变量，
-     由 .wave-* 设在 svg 上，defs 里的 stop 直接引用 */
-  .wave-ok { --wave-a: var(--info); --wave-b: var(--ok); --wave-fill: var(--info); }
-  .wave-mild { --wave-a: var(--info); --wave-b: var(--chart-3); --wave-fill: var(--chart-3); }
-  .wave-warn { --wave-a: var(--warn); --wave-b: var(--chart-4); --wave-fill: var(--warn); }
-  .wave-hot { --wave-a: var(--chart-4); --wave-b: var(--destructive); --wave-fill: var(--chart-4); }
-  .wave-bad { --wave-a: var(--destructive); --wave-b: var(--chart-5); --wave-fill: var(--destructive); }
-  .wave-muted { --wave-a: var(--muted-foreground); --wave-b: var(--muted-foreground); --wave-fill: var(--muted-foreground); }
+  /* 延迟曲线固定冷色（蓝 → 紫），丢包竖条固定暖色（见 LossBars 里的热力渐变），
+     两组数据靠色系与形态区分；严重度只体现在右侧数值的文字颜色上 */
+  .wave-cool { --wave-a: var(--chart-2); --wave-b: var(--chart-1); --wave-fill: var(--chart-2); }
 
   .neu {
     background-image: linear-gradient(
