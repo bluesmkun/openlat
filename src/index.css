@@ -39,13 +39,13 @@
   --grad-disk: linear-gradient(90deg, oklch(0.65 0.16 160), oklch(0.75 0.16 130));
   --grad-net: linear-gradient(90deg, oklch(0.72 0.16 75), oklch(0.68 0.18 45));
   --grad-danger: linear-gradient(90deg, oklch(0.6 0.22 25), oklch(0.68 0.2 50));
-  /* 热力色阶：丢包竖条自下而上取样，低饱和但档位分明 */
-  --heat-ok: oklch(0.87 0.065 170);
-  --heat-mild: oklch(0.865 0.08 128);
-  --heat-warn: oklch(0.855 0.09 92);
-  --heat-hot: oklch(0.805 0.1 52);
-  --heat-bad: oklch(0.755 0.105 24);
-  --heat-muted: oklch(0.91 0.012 275);
+  /* 热力色阶：12 小时色块逐档取样，低饱和但小尺寸下档位分明 */
+  --heat-ok: oklch(0.8 0.12 165);
+  --heat-mild: oklch(0.84 0.13 125);
+  --heat-warn: oklch(0.86 0.14 95);
+  --heat-hot: oklch(0.79 0.14 55);
+  --heat-bad: oklch(0.7 0.16 20);
+  --heat-muted: oklch(0.915 0.012 275);
   --sh-neu: 9px 9px 22px oklch(0.52 0.03 275 / 0.16), -7px -7px 18px oklch(1 0 0 / 0.9);
   --sh-neu-sm: 4px 4px 10px oklch(0.52 0.03 275 / 0.13), -3px -3px 8px oklch(1 0 0 / 0.85);
   --sh-inset: inset 2px 2px 5px oklch(0.52 0.03 275 / 0.15), inset -2px -2px 5px oklch(1 0 0 / 0.8);
@@ -84,12 +84,12 @@
   --grad-disk: linear-gradient(90deg, oklch(0.74 0.15 160), oklch(0.82 0.15 130));
   --grad-net: linear-gradient(90deg, oklch(0.82 0.15 75), oklch(0.78 0.17 45));
   --grad-danger: linear-gradient(90deg, oklch(0.68 0.2 25), oklch(0.76 0.18 50));
-  /* 热力色阶：丢包竖条自下而上取样，与浅色同一套色相递进，靠彩度承担严重度 */
-  --heat-ok: oklch(0.55 0.065 170);
-  --heat-mild: oklch(0.58 0.075 128);
-  --heat-warn: oklch(0.63 0.085 92);
-  --heat-hot: oklch(0.62 0.095 52);
-  --heat-bad: oklch(0.58 0.105 24);
+  /* 热力色阶：与浅色同一套色相递进，靠彩度承担严重度 */
+  --heat-ok: oklch(0.63 0.12 165);
+  --heat-mild: oklch(0.68 0.12 125);
+  --heat-warn: oklch(0.72 0.13 95);
+  --heat-hot: oklch(0.67 0.13 55);
+  --heat-bad: oklch(0.62 0.15 20);
   --heat-muted: oklch(0.35 0.018 275);
   --sh-neu: 10px 10px 24px oklch(0.09 0.015 275 / 0.6), -8px -8px 20px oklch(0.52 0.03 275 / 0.14);
   --sh-neu-sm: 4px 4px 10px oklch(0.09 0.015 275 / 0.55), -3px -3px 8px oklch(0.52 0.03 275 / 0.12);
@@ -202,10 +202,41 @@
   .bar-net { background-image: var(--grad-net); }
   .bar-danger { background-image: var(--grad-danger); }
 
-  /* 两条曲线形状语言相同，靠色系区分：延迟固定冷色（蓝 → 紫），丢包固定暖色（琥珀 → 红）；
-     严重度只体现在右侧数值的文字颜色上 */
-  .wave-cool { --wave-a: var(--chart-2); --wave-b: var(--chart-1); --wave-fill: var(--chart-2); }
-  .wave-warm { --wave-a: var(--chart-4); --wave-b: var(--chart-5); --wave-fill: var(--chart-4); }
+  /* 12 小时热力色块：每格一枚小圆角方块，顶部高光 + 底部浅投影做出微凸质感；
+     没有数据的格子反过来凹陷留白，随时段保留完整轨道 */
+  .heat-cell {
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.45), 0 1px 2px oklch(0.35 0.03 275 / 0.18);
+  }
+  .heat-ok {
+    background-color: var(--heat-ok);
+    background-image: linear-gradient(165deg, color-mix(in oklab, var(--heat-ok) 82%, white), var(--heat-ok));
+  }
+  .heat-mild {
+    background-color: var(--heat-mild);
+    background-image: linear-gradient(165deg, color-mix(in oklab, var(--heat-mild) 82%, white), var(--heat-mild));
+  }
+  .heat-warn {
+    background-color: var(--heat-warn);
+    background-image: linear-gradient(165deg, color-mix(in oklab, var(--heat-warn) 82%, white), var(--heat-warn));
+  }
+  .heat-hot {
+    background-color: var(--heat-hot);
+    background-image: linear-gradient(165deg, color-mix(in oklab, var(--heat-hot) 82%, white), var(--heat-hot));
+  }
+  .heat-bad {
+    background-color: var(--heat-bad);
+    background-image: linear-gradient(165deg, color-mix(in oklab, var(--heat-bad) 82%, white), var(--heat-bad));
+  }
+  .heat-muted {
+    background-color: var(--heat-muted);
+    box-shadow: inset 0 1px 3px oklch(0.35 0.03 275 / 0.18);
+  }
+  .dark .heat-cell {
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14), 0 1px 2px oklch(0 0 0 / 0.45);
+  }
+  .dark .heat-muted {
+    box-shadow: inset 0 1px 3px oklch(0 0 0 / 0.4);
+  }
 
   .neu {
     background-image: linear-gradient(

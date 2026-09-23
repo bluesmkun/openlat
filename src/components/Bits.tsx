@@ -1,8 +1,8 @@
-import { memo, useId, useState, type ComponentType, type ReactNode } from "react"
+import { memo, useState, type ComponentType, type ReactNode } from "react"
 import { Activity } from "lucide-react"
 
 import { Badge, type BadgeVariant } from "@/components/ui/badge"
-import { type Latency, type LatencyHour, type Node, type ProbeStat } from "@/lib/api"
+import { HOUR_BUCKETS, type Latency, type LatencyHour, type Node, type ProbeStat } from "@/lib/api"
 import {
   countryName,
   CYCLES,
@@ -200,42 +200,25 @@ function hourLabel(ts: number): string {
   return new Date(ts * 1000).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit" })
 }
 
-type Pt = { x: number; y: number }
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-
-/** Catmull-Rom 平滑，控制点收紧到 1/6，曲线不会在尖峰外溢出太远 */
-function waveLine(points: Pt[]): string {
-  if (points.length === 0) return ""
-  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] ?? points[i]
-    const p1 = points[i]
-    const p2 = points[i + 1]
-    const p3 = points[i + 2] ?? p2
-    const c1x = p1.x + (p2.x - p0.x) / 6
-    const c1y = p1.y + (p2.y - p0.y) / 6
-    const c2x = p2.x - (p3.x - p1.x) / 6
-    const c2y = p2.y - (p3.y - p1.y) / 6
-    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
-  }
-  return d
-}
-
-const W = 100
-
-const slotX = (i: number, count: number) => (count <= 1 ? W / 2 : (i * W) / (count - 1))
-
 export type TrackKind = "latency" | "loss"
 
-const TRACK: Record<TrackKind, { label: string; cls: string }> = {
-  latency: { label: "延迟", cls: "wave-cool" },
-  loss: { label: "丢包", cls: "wave-warm" },
+const TRACK: Record<TrackKind, string> = {
+  latency: "延迟",
+  loss: "丢包",
 }
 
-/** 12 小时单轨曲线：延迟走冷色、丢包走暖色，各自一条独立轨道，
- *  两者都是曲线但色系不同；缺口如实断开，末格没有数据时以虚线标出「现在」 */
-function TrackCurve({
+const HEAT_BLOCKS: Record<Heat, string> = {
+  ok: "heat-ok",
+  mild: "heat-mild",
+  warn: "heat-warn",
+  hot: "heat-hot",
+  bad: "heat-bad",
+  muted: "heat-muted",
+}
+
+/** 12 小时热力色块：每小时一格圆角方块，延迟与丢包各自一条轨道；
+ *  色块带微拟物的高光与投影，没有数据的格子凹陷留白 */
+function HeatTrack({
   hours,
   kind,
   probes,
@@ -248,134 +231,27 @@ function TrackCurve({
   compact?: boolean
   className?: string
 }) {
-  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
-  const H = compact ? (kind === "latency" ? 14 : 12) : kind === "latency" ? 36 : 20
-  const padY = compact ? 2 : kind === "latency" ? 4 : 3
-  const step = W / Math.max(hours.length, 1)
-  const values = hours.map((h) => (kind === "latency" ? h.latency : h.loss))
-  const clean = values.filter((v): v is number => v !== null)
-  const base = kind === "loss" ? 0 : clean.length > 0 ? Math.min(...clean) : 0
-  const hi = clean.length > 0 ? Math.max(...clean) : 1
-  const margin = Math.max((hi - base) * 0.18, hi * 0.05, 1)
-  const yMin = kind === "loss" ? 0 : Math.max(0, base - margin)
-  const yMax = Math.max(hi + margin, yMin + 1)
-  const py = (v: number) => clamp(H - padY - ((v - yMin) / (yMax - yMin)) * (H - padY * 2), padY, H - padY)
-
-  const segments: Pt[][] = []
-  let run: Pt[] = []
-  values.forEach((v, i) => {
-    if (v === null) {
-      if (run.length > 0) segments.push(run)
-      run = []
-    } else {
-      run.push({ x: slotX(i, values.length), y: py(v) })
-    }
-  })
-  if (run.length > 0) segments.push(run)
-
-  const last = segments.length > 0 ? segments[segments.length - 1] : null
-  const lastPt = last ? last[last.length - 1] : null
-  const fmt = (v: number | null) =>
-    v === null ? "无数据" : kind === "latency" ? `${Math.round(v)} ms` : `${v.toFixed(1)}%`
-
+  const cell = cn("heat-cell min-w-0 flex-1", compact ? "rounded-[3px]" : "rounded-[5px]")
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      aria-hidden
-      className={cn(TRACK[kind].cls, "block w-full", className)}
-    >
-      <defs>
-        <linearGradient id={`${kind}-stroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" style={{ stopColor: "var(--wave-a)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--wave-b)" }} />
-        </linearGradient>
-        <linearGradient id={`${kind}-fill-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
-          <stop offset="0%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.3 }} />
-          <stop offset="100%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.02 }} />
-        </linearGradient>
-      </defs>
-
-      <line
-        x1="0"
-        y1={H - 0.5}
-        x2={W}
-        y2={H - 0.5}
-        className="stroke-border"
-        strokeWidth="1"
-        opacity="0.7"
-        vectorEffect="non-scaling-stroke"
-      />
-
-      {segments.map((points, i) => {
-        const d = waveLine(points)
-        if (points.length === 1) {
-          const x = clamp(points[0].x, 0.9, W - 0.9)
-          return (
-            <rect
-              key={i}
-              x={x - 0.9}
-              y={points[0].y - 0.9}
-              width="1.8"
-              height="1.8"
-              rx="0.9"
-              fill={`url(#${kind}-stroke-${uid})`}
-            />
-          )
-        }
-        return (
-          <g key={i}>
-            <path
-              d={`${d} L ${points[points.length - 1].x} ${H} L ${points[0].x} ${H} Z`}
-              fill={`url(#${kind}-fill-${uid})`}
-            />
-            <path
-              d={d}
-              fill="none"
-              stroke={`url(#${kind}-stroke-${uid})`}
-              strokeWidth="4"
-              strokeOpacity="0.16"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <path
-              d={d}
-              fill="none"
-              stroke={`url(#${kind}-stroke-${uid})`}
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          </g>
-        )
-      })}
-
-      {lastPt && lastPt.x < W - 0.5 && (
-        <line
-          x1={W - 0.3}
-          y1={padY}
-          x2={W - 0.3}
-          y2={H - padY}
-          stroke="var(--wave-b)"
-          strokeWidth="1"
-          strokeDasharray="2 2"
-          opacity="0.4"
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
-
-      {hours.map((hour, i) => (
-        <rect key={i} x={slotX(i, hours.length) - step / 2} y="0" width={step} height={H} fill="transparent" pointerEvents="all">
-          <title>
-            {`${hourLabel(hour.ts)} · ${TRACK[kind].label} ${fmt(
-              kind === "latency" ? hour.latency : hour.loss,
-            )}${probes > 1 ? `（${probes} 个探测均值）` : ""}`}
-          </title>
-        </rect>
-      ))}
-    </svg>
+    <span className={cn("flex min-w-0 items-stretch", compact ? "gap-[2px]" : "gap-1", className)}>
+      {hours.length > 0
+        ? hours.map((hour, i) => {
+            const value = kind === "latency" ? hour.latency : hour.loss
+            return (
+              <span
+                key={i}
+                title={`${hourLabel(hour.ts)} · ${TRACK[kind]} ${
+                  value === null ? "无数据" : kind === "latency" ? `${Math.round(value)} ms` : `${value.toFixed(1)}%`
+                }${probes > 1 ? `（${probes} 个探测均值）` : ""}`}
+                className={cn(cell, HEAT_BLOCKS[heatOf(value, kind)])}
+              />
+            )
+          })
+        : // 没有探测数据时也铺满 12 格空槽，卡片行高与有数据的节点完全一致
+          Array.from({ length: HOUR_BUCKETS }, (_, i) => (
+            <span key={i} className={cn(cell, HEAT_BLOCKS.muted)} />
+          ))}
+    </span>
   )
 }
 
@@ -417,7 +293,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
       <div className="mt-2 space-y-1.5">
         <div className="flex items-center gap-2">
           <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">延迟</span>
-          <TrackCurve hours={hours} kind="latency" probes={probes.length} className="h-9 min-w-0 flex-1" />
+          <HeatTrack hours={hours} kind="latency" probes={probes.length} className="h-5 min-w-0 flex-1" />
           <span
             className={cn(
               "tnum w-12 shrink-0 text-right text-[10px] leading-none",
@@ -429,7 +305,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
         </div>
         <div className="flex items-center gap-2">
           <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">丢包</span>
-          <TrackCurve hours={hours} kind="loss" probes={probes.length} className="h-5 min-w-0 flex-1" />
+          <HeatTrack hours={hours} kind="loss" probes={probes.length} className="h-5 min-w-0 flex-1" />
           <span
             className={cn(
               "tnum w-12 shrink-0 text-right text-[10px] leading-none",
@@ -456,9 +332,9 @@ export function LatencyMini({ latency, className }: { latency?: Latency; classNa
   const avgLoss = latency?.avgLoss ?? null
   return (
     <span className={cn("flex min-w-0 flex-col justify-center gap-1", className)}>
-      {/* 与卡片视图同一份 hours（多探测按小时求均值）与同一对组件，两个视图显示一致 */}
-      <TrackCurve hours={hours} kind="latency" probes={probes.length} compact className="h-3.5" />
-      <TrackCurve hours={hours} kind="loss" probes={probes.length} compact className="h-3" />
+      {/* 与卡片视图同一份 hours（多探测按小时求均值）与同一个热力色块组件，两个视图显示一致 */}
+      <HeatTrack hours={hours} kind="latency" probes={probes.length} compact className="h-2.5" />
+      <HeatTrack hours={hours} kind="loss" probes={probes.length} compact className="h-2.5" />
       <span className="flex min-w-0 items-center justify-between gap-2 text-[10px] leading-none whitespace-nowrap">
         <span className={cn("tnum truncate", TONE_TEXT[best.tone])}>{best.text}</span>
         <span className={cn("tnum shrink-0", HEAT_TEXT[heatOf(avgLoss, "loss")])}>
