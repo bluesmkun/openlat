@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 
+import { isScrollIdle, onScrollIdle } from "./gate.ts"
+
 export type Metrics = {
   uptime: number
   cpu: number
@@ -106,14 +108,44 @@ export function safeNodes(nodes: Node[]): Node[] {
   })
 }
 
+/** 差异在展示精度以内就算没变：指标每 2 秒都在小幅抖动，为看不见的变化重绘整张卡不值得 */
+function near(a: number, b: number, step: number): boolean {
+  return Math.abs(a - b) < step
+}
+
 function sameMetrics(a: Metrics | null, b: Metrics | null): boolean {
   if (a === b) return true
   if (!a || !b) return false
-  for (const key in a) {
-    if (key === "load") continue
-    if (a[key as keyof Metrics] !== b[key as keyof Metrics]) return false
-  }
-  return a.load[0] === b.load[0] && a.load[1] === b.load[1] && a.load[2] === b.load[2]
+  const mem = Math.max(a.mem_total, a.mem_used, 1) / 200
+  const disk = Math.max(a.disk_total, a.disk_used, 1) / 200
+  const rx = Math.max(a.net_rx, b.net_rx, 16 * 1024) / 100
+  const tx = Math.max(a.net_tx, b.net_tx, 16 * 1024) / 100
+  const totalRx = Math.max(a.total_rx, 1024 ** 3) / 200
+  const totalTx = Math.max(a.total_tx, 1024 ** 3) / 200
+  const monthRx = Math.max(a.month_rx, 1024 ** 3) / 200
+  const monthTx = Math.max(a.month_tx, 1024 ** 3) / 200
+  return (
+    near(a.cpu, b.cpu, 0.05) &&
+    near(a.load[0], b.load[0], 0.005) &&
+    near(a.load[1], b.load[1], 0.005) &&
+    near(a.load[2], b.load[2], 0.005) &&
+    near(a.mem_used, b.mem_used, mem) &&
+    near(a.disk_used, b.disk_used, disk) &&
+    near(a.net_rx, b.net_rx, rx) &&
+    near(a.net_tx, b.net_tx, tx) &&
+    near(a.total_rx, b.total_rx, totalRx) &&
+    near(a.total_tx, b.total_tx, totalTx) &&
+    near(a.month_rx, b.month_rx, monthRx) &&
+    near(a.month_tx, b.month_tx, monthTx) &&
+    Math.round(a.tcp) === Math.round(b.tcp) &&
+    Math.round(a.udp) === Math.round(b.udp) &&
+    Math.round(a.procs) === Math.round(b.procs) &&
+    near(a.uptime, b.uptime, 30) &&
+    near(a.swap_used, b.swap_used, Math.max(a.swap_total, b.swap_total, 1024 ** 2) / 200) &&
+    a.mem_total === b.mem_total &&
+    a.swap_total === b.swap_total &&
+    a.disk_total === b.disk_total
+  )
 }
 
 function sameNode(a: Node, b: Node): boolean {
@@ -146,14 +178,30 @@ export function useNodes() {
     let poll: ReturnType<typeof setInterval> | null = null
     let retry: ReturnType<typeof setTimeout> | null = null
     let stopped = false
+    let hasData = false
+    let pending: Node[] | null = null
 
-    const receive = (list: Node[]) => {
-      const safe = safeNodes(list)
-      sample(safe)
-      setNodes((prev) => reconcile(prev, safe))
+    const commit = (list: Node[]) => {
+      hasData = true
+      sample(list)
+      setNodes((prev) => reconcile(prev, list))
       setError(null)
       setClosed(false)
     }
+
+    // 首屏数据无论是否在滚动都要立即上屏，之后的更新滚动期间先攒着
+    const receive = (list: Node[]) => {
+      const safe = safeNodes(list)
+      if (isScrollIdle() || !hasData) commit(safe)
+      else pending = safe
+    }
+
+    const offIdle = onScrollIdle(() => {
+      if (pending === null) return
+      const list = pending
+      pending = null
+      commit(list)
+    })
 
     const fetchOnce = () =>
       api<{ nodes: Node[] }>("/nodes")
@@ -191,6 +239,7 @@ export function useNodes() {
 
     return () => {
       stopped = true
+      offIdle()
       socket?.close()
       if (poll) clearInterval(poll)
       if (retry) clearTimeout(retry)
@@ -415,26 +464,57 @@ export function useLatency(nodes: Node[] | null): LatencyMap {
     if (!ids) return
     const targets = ids.split(",").map(Number).filter((id) => Number.isFinite(id))
     const queue: number[] = []
+    // 正在请求的节点单独记一份：只查 queue 会把在途节点反复重新入队，
+    // 节点一多就出现同一份数据被重复拉取、解析，白占主线程
+    const inflight = new Set<number>()
     let running = 0
     let stopped = false
+    let hasStats = false
+    let pending = new Map<number, Latency>()
+
+    // 滚动期间把新到的探测结果攒起来，停滚后一次提交，避免重绘压在滚动帧上
+    const put = (id: number, value: Latency) => {
+      if (isScrollIdle() || !hasStats) {
+        hasStats = true
+        setStats((s) => ({ ...s, [id]: value }))
+      } else {
+        pending.set(id, value)
+      }
+    }
+
+    const offIdle = onScrollIdle(() => {
+      if (pending.size === 0) return
+      const batch = [...pending.entries()]
+      pending = new Map()
+      setStats((s) => ({ ...s, ...Object.fromEntries(batch) }))
+    })
 
     const pump = () => {
       if (stopped) return
       while (running < CONCURRENCY && queue.length > 0) {
         const id = queue.shift()!
+        inflight.add(id)
         running++
         fetchHistory(id, 24, "ping", 96)
           .then((history) => {
-            if (!stopped) setStats((s) => ({ ...s, [id]: summarizePing(history) }))
+            if (!stopped) put(id, summarizePing(history))
           })
           .catch(() => {
             if (!stopped)
-              setStats((s) => ({
-                ...s,
-                [id]: { latency: null, loss: 0, probe: "", jitter: null, probes: [], hours: [], avgLatency: null, avgLoss: null, failed: true },
-              }))
+              put(id, {
+                latency: null,
+                loss: 0,
+                probe: "",
+                jitter: null,
+                probes: [],
+                hours: [],
+                avgLatency: null,
+                avgLoss: null,
+                failed: true,
+              })
           })
           .finally(() => {
+            inflight.delete(id)
             running--
             pump()
           })
@@ -442,7 +522,7 @@ export function useLatency(nodes: Node[] | null): LatencyMap {
     }
 
     const enqueue = () => {
-      for (const id of targets) if (!queue.includes(id)) queue.push(id)
+      for (const id of targets) if (!inflight.has(id) && !queue.includes(id)) queue.push(id)
       pump()
     }
 
@@ -450,6 +530,7 @@ export function useLatency(nodes: Node[] | null): LatencyMap {
     const timer = setInterval(enqueue, REFRESH_MS)
     return () => {
       stopped = true
+      offIdle()
       clearInterval(timer)
     }
   }, [ids])

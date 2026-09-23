@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts"
 
-import { CountryLabel, latencyText, Stat, StatusPill, TONE_TEXT, type IconType } from "@/components/Bits"
+import { CountryLabel, ExpiryText, latencyText, Stat, StatusPill, TONE_TEXT, type IconType } from "@/components/Bits"
 import { Badge } from "@/components/ui/badge"
 import { Select } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -70,7 +70,7 @@ const Y_WIDTH = 64
 
 const PROBE_GRID = "grid-cols-[minmax(6rem,1fr)_3.5rem_3.5rem_4.5rem_3.25rem_4.5rem]"
 
-type FactRow = { label: string; value: string }
+type FactRow = { label: string; value: string; node?: ReactNode }
 type FactGroup = { label: string; icon: IconType; facts: FactRow[] }
 
 const PALETTE = [
@@ -263,8 +263,8 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
   const group = (label: string, icon: IconType) => {
     const facts: FactRow[] = []
     groups.push({ label, icon, facts })
-    return (name: string, value?: string | number | null) => {
-      if (value !== undefined && value !== null && value !== "") facts.push({ label: name, value: String(value) })
+    return (name: string, value?: string | number | null, node?: ReactNode) => {
+      if (value !== undefined && value !== null && value !== "") facts.push({ label: name, value: String(value), node })
     }
   }
 
@@ -290,7 +290,18 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
 
   const billing = group("费用与到期", Wallet)
   billing("续费", node.price > 0 ? `${money(node.price, node.currency)}${cycle ? ` / ${cycle}` : ""}` : "免费")
-  billing("到期", node.expires_at ? `${node.expires_at} · ${expiryLabel(daysUntil(node.expires_at))}` : "永不到期")
+  // 到期文字沿用 ExpiryText：详情页与卡片 / 列表共用同一套颜色阈值
+  billing(
+    "到期",
+    node.expires_at ? `${node.expires_at} · ${expiryLabel(daysUntil(node.expires_at))}` : "永不到期",
+    node.expires_at ? (
+      <>
+        {node.expires_at} · <ExpiryText date={node.expires_at} />
+      </>
+    ) : (
+      <span className="text-muted-foreground">永不到期</span>
+    ),
+  )
 
   return (
     <div className="space-y-5">
@@ -667,7 +678,7 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
                     <Fragment key={fact.label}>
                       <dt className="text-xs text-muted-foreground">{fact.label}</dt>
                       <dd className="tnum min-w-0 text-sm break-words" title={fact.value}>
-                        {fact.value}
+                        {fact.node ?? fact.value}
                       </dd>
                     </Fragment>
                   ))}
