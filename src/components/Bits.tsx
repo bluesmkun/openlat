@@ -226,31 +226,40 @@ const W = 100
 
 const slotX = (i: number, count: number) => (count <= 1 ? W / 2 : (i * W) / (count - 1))
 
-/** 12 小时延迟曲线：冷色渐变面积波，单独一条轨道，缺口如实断开，
- *  末格没有数据时以虚线标出「现在」 */
-function LatencyCurve({
+export type TrackKind = "latency" | "loss"
+
+const TRACK: Record<TrackKind, { label: string; cls: string }> = {
+  latency: { label: "延迟", cls: "wave-cool" },
+  loss: { label: "丢包", cls: "wave-warm" },
+}
+
+/** 12 小时单轨曲线：延迟走冷色、丢包走暖色，各自一条独立轨道，
+ *  两者都是曲线但色系不同；缺口如实断开，末格没有数据时以虚线标出「现在」 */
+function TrackCurve({
   hours,
+  kind,
   probes,
   compact = false,
   className,
 }: {
   hours: LatencyHour[]
+  kind: TrackKind
   probes: number
   compact?: boolean
   className?: string
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
-  const H = compact ? 14 : 36
-  const padY = compact ? 2 : 4
+  const H = compact ? (kind === "latency" ? 14 : 12) : kind === "latency" ? 36 : 20
+  const padY = compact ? 2 : kind === "latency" ? 4 : 3
   const step = W / Math.max(hours.length, 1)
-  const values = hours.map((h) => h.latency)
+  const values = hours.map((h) => (kind === "latency" ? h.latency : h.loss))
   const clean = values.filter((v): v is number => v !== null)
-  const lo = clean.length > 0 ? Math.min(...clean) : 0
+  const base = kind === "loss" ? 0 : clean.length > 0 ? Math.min(...clean) : 0
   const hi = clean.length > 0 ? Math.max(...clean) : 1
-  const margin = Math.max((hi - lo) * 0.18, hi * 0.05, 1)
-  const yMin = Math.max(0, lo - margin)
-  const yMax = hi + margin
-  const py = (v: number) => clamp(H - padY - ((v - yMin) / Math.max(yMax - yMin, 1)) * (H - padY * 2), padY, H - padY)
+  const margin = Math.max((hi - base) * 0.18, hi * 0.05, 1)
+  const yMin = kind === "loss" ? 0 : Math.max(0, base - margin)
+  const yMax = Math.max(hi + margin, yMin + 1)
+  const py = (v: number) => clamp(H - padY - ((v - yMin) / (yMax - yMin)) * (H - padY * 2), padY, H - padY)
 
   const segments: Pt[][] = []
   let run: Pt[] = []
@@ -266,20 +275,22 @@ function LatencyCurve({
 
   const last = segments.length > 0 ? segments[segments.length - 1] : null
   const lastPt = last ? last[last.length - 1] : null
+  const fmt = (v: number | null) =>
+    v === null ? "无数据" : kind === "latency" ? `${Math.round(v)} ms` : `${v.toFixed(1)}%`
 
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none"
       aria-hidden
-      className={cn("wave-cool block w-full", className)}
+      className={cn(TRACK[kind].cls, "block w-full", className)}
     >
       <defs>
-        <linearGradient id={`lat-stroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id={`${kind}-stroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" style={{ stopColor: "var(--wave-a)" }} />
           <stop offset="100%" style={{ stopColor: "var(--wave-b)" }} />
         </linearGradient>
-        <linearGradient id={`lat-fill-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
+        <linearGradient id={`${kind}-fill-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
           <stop offset="0%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.3 }} />
           <stop offset="100%" style={{ stopColor: "var(--wave-fill)", stopOpacity: 0.02 }} />
         </linearGradient>
@@ -308,7 +319,7 @@ function LatencyCurve({
               width="1.8"
               height="1.8"
               rx="0.9"
-              fill={`url(#lat-stroke-${uid})`}
+              fill={`url(#${kind}-stroke-${uid})`}
             />
           )
         }
@@ -316,12 +327,12 @@ function LatencyCurve({
           <g key={i}>
             <path
               d={`${d} L ${points[points.length - 1].x} ${H} L ${points[0].x} ${H} Z`}
-              fill={`url(#lat-fill-${uid})`}
+              fill={`url(#${kind}-fill-${uid})`}
             />
             <path
               d={d}
               fill="none"
-              stroke={`url(#lat-stroke-${uid})`}
+              stroke={`url(#${kind}-stroke-${uid})`}
               strokeWidth="4"
               strokeOpacity="0.16"
               strokeLinecap="round"
@@ -331,7 +342,7 @@ function LatencyCurve({
             <path
               d={d}
               fill="none"
-              stroke={`url(#lat-stroke-${uid})`}
+              stroke={`url(#${kind}-stroke-${uid})`}
               strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -358,82 +369,9 @@ function LatencyCurve({
       {hours.map((hour, i) => (
         <rect key={i} x={slotX(i, hours.length) - step / 2} y="0" width={step} height={H} fill="transparent" pointerEvents="all">
           <title>
-            {`${hourLabel(hour.ts)} · 延迟 ${
-              hour.latency === null ? "无数据" : `${Math.round(hour.latency)} ms`
-            }${probes > 1 ? `（${probes} 个探测均值）` : ""}`}
-          </title>
-        </rect>
-      ))}
-    </svg>
-  )
-}
-
-/** 12 小时丢包竖条：暖色单独一条轨道，与冷色延迟曲线在颜色和形态上都不同，
- *  两者不会再混在一起 */
-function LossBars({
-  hours,
-  probes,
-  compact = false,
-  className,
-}: {
-  hours: LatencyHour[]
-  probes: number
-  compact?: boolean
-  className?: string
-}) {
-  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
-  const H = compact ? 10 : 16
-  const padTop = compact ? 1.5 : 2.5
-  const step = W / Math.max(hours.length, 1)
-  const maxBar = H - padTop - 0.5
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      aria-hidden
-      className={cn("block w-full", className)}
-    >
-      <defs>
-        <linearGradient id={`loss-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1={H} x2="0" y2="0">
-          <stop offset="0%" style={{ stopColor: "var(--heat-hot)", stopOpacity: 0.5 }} />
-          <stop offset="100%" style={{ stopColor: "var(--heat-bad)", stopOpacity: 0.95 }} />
-        </linearGradient>
-      </defs>
-
-      <line
-        x1="0"
-        y1={H - 0.5}
-        x2={W}
-        y2={H - 0.5}
-        className="stroke-border"
-        strokeWidth="1"
-        opacity="0.7"
-        vectorEffect="non-scaling-stroke"
-      />
-
-      {hours.map((hour, i) => {
-        if (hour.loss === null || hour.loss <= 0) return null
-        const bar = Math.max(1.2, Math.min(hour.loss / 10, 1) * maxBar)
-        return (
-          <rect
-            key={i}
-            x={slotX(i, hours.length) - step * 0.27}
-            y={H - bar}
-            width={step * 0.54}
-            height={bar}
-            rx="0.5"
-            fill={`url(#loss-${uid})`}
-          />
-        )
-      })}
-
-      {hours.map((hour, i) => (
-        <rect key={i} x={slotX(i, hours.length) - step / 2} y="0" width={step} height={H} fill="transparent" pointerEvents="all">
-          <title>
-            {`${hourLabel(hour.ts)} · 丢包 ${hour.loss === null ? "无数据" : `${hour.loss.toFixed(1)}%`}${
-              probes > 1 ? `（${probes} 个探测均值）` : ""
-            }`}
+            {`${hourLabel(hour.ts)} · ${TRACK[kind].label} ${fmt(
+              kind === "latency" ? hour.latency : hour.loss,
+            )}${probes > 1 ? `（${probes} 个探测均值）` : ""}`}
           </title>
         </rect>
       ))}
@@ -479,7 +417,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
       <div className="mt-2 space-y-1.5">
         <div className="flex items-center gap-2">
           <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">延迟</span>
-          <LatencyCurve hours={hours} probes={probes.length} className="h-9 min-w-0 flex-1" />
+          <TrackCurve hours={hours} kind="latency" probes={probes.length} className="h-9 min-w-0 flex-1" />
           <span
             className={cn(
               "tnum w-12 shrink-0 text-right text-[10px] leading-none",
@@ -491,7 +429,7 @@ export const LatencyPanel = memo(function LatencyPanel({ latency, className }: {
         </div>
         <div className="flex items-center gap-2">
           <span className="w-7 shrink-0 text-[10px] leading-none text-muted-foreground">丢包</span>
-          <LossBars hours={hours} probes={probes.length} className="h-4 min-w-0 flex-1" />
+          <TrackCurve hours={hours} kind="loss" probes={probes.length} className="h-5 min-w-0 flex-1" />
           <span
             className={cn(
               "tnum w-12 shrink-0 text-right text-[10px] leading-none",
@@ -519,8 +457,8 @@ export function LatencyMini({ latency, className }: { latency?: Latency; classNa
   return (
     <span className={cn("flex min-w-0 flex-col justify-center gap-1", className)}>
       {/* 与卡片视图同一份 hours（多探测按小时求均值）与同一对组件，两个视图显示一致 */}
-      <LatencyCurve hours={hours} probes={probes.length} compact className="h-3.5" />
-      <LossBars hours={hours} probes={probes.length} compact className="h-2.5" />
+      <TrackCurve hours={hours} kind="latency" probes={probes.length} compact className="h-3.5" />
+      <TrackCurve hours={hours} kind="loss" probes={probes.length} compact className="h-3" />
       <span className="flex min-w-0 items-center justify-between gap-2 text-[10px] leading-none whitespace-nowrap">
         <span className={cn("tnum truncate", TONE_TEXT[best.tone])}>{best.text}</span>
         <span className={cn("tnum shrink-0", HEAT_TEXT[heatOf(avgLoss, "loss")])}>

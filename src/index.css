@@ -202,9 +202,10 @@
   .bar-net { background-image: var(--grad-net); }
   .bar-danger { background-image: var(--grad-danger); }
 
-  /* 延迟曲线固定冷色（蓝 → 紫），丢包竖条固定暖色（见 LossBars 里的热力渐变），
-     两组数据靠色系与形态区分；严重度只体现在右侧数值的文字颜色上 */
+  /* 两条曲线形状语言相同，靠色系区分：延迟固定冷色（蓝 → 紫），丢包固定暖色（琥珀 → 红）；
+     严重度只体现在右侧数值的文字颜色上 */
   .wave-cool { --wave-a: var(--chart-2); --wave-b: var(--chart-1); --wave-fill: var(--chart-2); }
+  .wave-warm { --wave-a: var(--chart-4); --wave-b: var(--chart-5); --wave-fill: var(--chart-4); }
 
   .neu {
     background-image: linear-gradient(
