@@ -1,8 +1,9 @@
 import { memo, useState, type ComponentType, type ReactNode } from "react"
-import { Activity, Apple, LayoutGrid, Server, SquareTerminal } from "lucide-react"
+import { Activity, LayoutGrid, Server, SquareTerminal } from "lucide-react"
 
 import { Badge, type BadgeVariant } from "@/components/ui/badge"
 import { HOUR_BUCKETS, type Latency, type LatencyHour, type Node, type ProbeStat } from "@/lib/api"
+import { OS_ICONS } from "@/lib/os-icons"
 import {
   countryName,
   CYCLES,
@@ -160,20 +161,45 @@ export function CountryLabel({ code, name = false, className }: { code: string; 
   )
 }
 
-const WINDOWS = /windows|wsl/i
-const MACOS = /mac|darwin|ios|os x/i
-const UNIX = /linux|debian|ubuntu|centos|alma|rocky|fedora|arch|alpine|suse|gentoo|openwrt|bsd|unix/i
+/** 发行版识别：具体发行版在前，通用 Unix / Windows 在后 */
+const OS_MATCHERS: [RegExp, string][] = [
+  [/debian/i, "debian"],
+  [/ubuntu/i, "ubuntu"],
+  [/centos/i, "centos"],
+  [/alma/i, "almalinux"],
+  [/rocky/i, "rockylinux"],
+  [/fedora/i, "fedora"],
+  [/arch/i, "archlinux"],
+  [/alpine/i, "alpinelinux"],
+  [/suse|sles/i, "opensuse"],
+  [/gentoo/i, "gentoo"],
+  [/openwrt/i, "openwrt"],
+  [/freebsd/i, "freebsd"],
+  [/red ?hat|rhel/i, "redhat"],
+  [/mac|darwin|ios|os x/i, "apple"],
+]
 
-/** 列表视图的系统列：只画一个图标，完整版本名放进 title，省下整列文字宽度 */
+/** 列表视图的系统列：只画对应发行版 / 系统的图标，完整版本名放进 title，
+ *  省下整列文字宽度；认不出的系统退回落格或终端图标 */
 export function OsIcon({ os, className }: { os: string; className?: string }) {
   const label = os ? osName(os) : "等待首次上报"
-  const Icon = WINDOWS.test(label) ? LayoutGrid : MACOS.test(label) ? Apple : UNIX.test(label) ? SquareTerminal : Server
+  const path = OS_ICONS[OS_MATCHERS.find(([re]) => re.test(label))?.[1] ?? ""] ?? null
   return (
     <span
       title={label}
       className={cn("grid size-5 shrink-0 place-items-center rounded-md bg-muted/60 text-muted-foreground", className)}
     >
-      <Icon className="size-3" />
+      {path ? (
+        <svg viewBox="0 0 24 24" aria-hidden className="size-3.5 fill-current">
+          <path d={path} />
+        </svg>
+      ) : /windows|wsl/i.test(label) ? (
+        <LayoutGrid className="size-3" />
+      ) : /linux|unix|bsd/i.test(label) ? (
+        <SquareTerminal className="size-3" />
+      ) : (
+        <Server className="size-3" />
+      )}
     </span>
   )
 }
