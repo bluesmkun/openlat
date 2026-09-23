@@ -1,0 +1,327 @@
+@import "tailwindcss" source(none);
+@source "../index.html";
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.006 275);
+  --foreground: oklch(0.23 0.03 275);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.23 0.03 275);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0.03 275);
+  --primary: oklch(0.55 0.21 275);
+  --primary-foreground: oklch(0.99 0.005 275);
+  --secondary: oklch(0.955 0.015 275);
+  --secondary-foreground: oklch(0.32 0.05 275);
+  --muted: oklch(0.955 0.012 275);
+  --muted-foreground: oklch(0.53 0.035 275);
+  --accent: oklch(0.94 0.028 275);
+  --accent-foreground: oklch(0.32 0.06 275);
+  --destructive: oklch(0.58 0.22 22);
+  --destructive-foreground: oklch(0.99 0.005 22);
+  --border: oklch(0.9 0.018 275);
+  --input: oklch(0.9 0.018 275);
+  --ring: oklch(0.62 0.17 275);
+  --ok: oklch(0.62 0.16 160);
+  --warn: oklch(0.68 0.16 65);
+  --info: oklch(0.6 0.15 235);
+  --chart-1: oklch(0.56 0.21 285);
+  --chart-2: oklch(0.62 0.15 230);
+  --chart-3: oklch(0.64 0.15 160);
+  --chart-4: oklch(0.72 0.16 70);
+  --chart-5: oklch(0.62 0.2 15);
+  --grad-cpu: linear-gradient(90deg, oklch(0.58 0.22 285), oklch(0.62 0.2 320));
+  --grad-mem: linear-gradient(90deg, oklch(0.62 0.16 230), oklch(0.7 0.14 195));
+  --grad-disk: linear-gradient(90deg, oklch(0.65 0.16 160), oklch(0.75 0.16 130));
+  --grad-net: linear-gradient(90deg, oklch(0.72 0.16 75), oklch(0.68 0.18 45));
+  --grad-danger: linear-gradient(90deg, oklch(0.6 0.22 25), oklch(0.68 0.2 50));
+  /* 热力色阶：丢包竖条自下而上取样，低饱和但档位分明 */
+  --heat-ok: oklch(0.87 0.065 170);
+  --heat-mild: oklch(0.865 0.08 128);
+  --heat-warn: oklch(0.855 0.09 92);
+  --heat-hot: oklch(0.805 0.1 52);
+  --heat-bad: oklch(0.755 0.105 24);
+  --heat-muted: oklch(0.91 0.012 275);
+  --sh-neu: 9px 9px 22px oklch(0.52 0.03 275 / 0.16), -7px -7px 18px oklch(1 0 0 / 0.9);
+  --sh-neu-sm: 4px 4px 10px oklch(0.52 0.03 275 / 0.13), -3px -3px 8px oklch(1 0 0 / 0.85);
+  --sh-inset: inset 2px 2px 5px oklch(0.52 0.03 275 / 0.15), inset -2px -2px 5px oklch(1 0 0 / 0.8);
+}
+
+.dark {
+  --background: oklch(0.165 0.022 275);
+  --foreground: oklch(0.96 0.008 275);
+  --card: oklch(0.215 0.028 275);
+  --card-foreground: oklch(0.96 0.008 275);
+  --popover: oklch(0.215 0.028 275);
+  --popover-foreground: oklch(0.96 0.008 275);
+  --primary: oklch(0.72 0.17 275);
+  --primary-foreground: oklch(0.17 0.03 275);
+  --secondary: oklch(0.27 0.032 275);
+  --secondary-foreground: oklch(0.95 0.01 275);
+  --muted: oklch(0.27 0.032 275);
+  --muted-foreground: oklch(0.72 0.03 275);
+  --accent: oklch(0.3 0.05 275);
+  --accent-foreground: oklch(0.96 0.01 275);
+  --destructive: oklch(0.66 0.2 22);
+  --destructive-foreground: oklch(0.17 0.03 22);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.65 0.16 275);
+  --ok: oklch(0.74 0.16 160);
+  --warn: oklch(0.8 0.15 75);
+  --info: oklch(0.72 0.14 230);
+  --chart-1: oklch(0.72 0.18 285);
+  --chart-2: oklch(0.75 0.14 220);
+  --chart-3: oklch(0.78 0.15 160);
+  --chart-4: oklch(0.83 0.15 75);
+  --chart-5: oklch(0.72 0.18 15);
+  --grad-cpu: linear-gradient(90deg, oklch(0.68 0.2 285), oklch(0.72 0.18 320));
+  --grad-mem: linear-gradient(90deg, oklch(0.7 0.15 230), oklch(0.78 0.13 195));
+  --grad-disk: linear-gradient(90deg, oklch(0.74 0.15 160), oklch(0.82 0.15 130));
+  --grad-net: linear-gradient(90deg, oklch(0.82 0.15 75), oklch(0.78 0.17 45));
+  --grad-danger: linear-gradient(90deg, oklch(0.68 0.2 25), oklch(0.76 0.18 50));
+  /* 热力色阶：丢包竖条自下而上取样，与浅色同一套色相递进，靠彩度承担严重度 */
+  --heat-ok: oklch(0.55 0.065 170);
+  --heat-mild: oklch(0.58 0.075 128);
+  --heat-warn: oklch(0.63 0.085 92);
+  --heat-hot: oklch(0.62 0.095 52);
+  --heat-bad: oklch(0.58 0.105 24);
+  --heat-muted: oklch(0.35 0.018 275);
+  --sh-neu: 10px 10px 24px oklch(0.09 0.015 275 / 0.6), -8px -8px 20px oklch(0.52 0.03 275 / 0.14);
+  --sh-neu-sm: 4px 4px 10px oklch(0.09 0.015 275 / 0.55), -3px -3px 8px oklch(0.52 0.03 275 / 0.12);
+  --sh-inset: inset 2px 2px 6px oklch(0.09 0.015 275 / 0.55), inset -2px -2px 6px oklch(0.52 0.03 275 / 0.1);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-heat-ok: var(--heat-ok);
+  --color-heat-mild: var(--heat-mild);
+  --color-heat-warn: var(--heat-warn);
+  --color-heat-hot: var(--heat-hot);
+  --color-heat-bad: var(--heat-bad);
+  --color-heat-muted: var(--heat-muted);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background-image:
+      radial-gradient(52rem 34rem at 104% -10%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%),
+      radial-gradient(44rem 30rem at -12% -6%, color-mix(in oklab, var(--info) 9%, transparent), transparent 70%);
+  }
+
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    border-radius: 999px;
+    filter: blur(72px);
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  body::before {
+    width: 28rem;
+    height: 28rem;
+    top: -10rem;
+    right: -8rem;
+    background: color-mix(in oklab, var(--primary) 32%, transparent);
+  }
+
+  body::after {
+    width: 24rem;
+    height: 24rem;
+    bottom: -9rem;
+    left: -7rem;
+    background: color-mix(in oklab, var(--info) 26%, transparent);
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 25%, transparent);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 32%, transparent);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent); }
+}
+
+@layer utilities {
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .bar-cpu { background-image: var(--grad-cpu); }
+  .bar-mem { background-image: var(--grad-mem); }
+  .bar-disk { background-image: var(--grad-disk); }
+  .bar-net { background-image: var(--grad-net); }
+  .bar-danger { background-image: var(--grad-danger); }
+
+  /* 延迟波形按严重度换一组渐变：曲线起点 → 终点、面积填充色三个变量，
+     由 .wave-* 设在 svg 上，defs 里的 stop 直接引用 */
+  .wave-ok { --wave-a: var(--info); --wave-b: var(--ok); --wave-fill: var(--info); }
+  .wave-mild { --wave-a: var(--info); --wave-b: var(--chart-3); --wave-fill: var(--chart-3); }
+  .wave-warn { --wave-a: var(--warn); --wave-b: var(--chart-4); --wave-fill: var(--warn); }
+  .wave-hot { --wave-a: var(--chart-4); --wave-b: var(--destructive); --wave-fill: var(--chart-4); }
+  .wave-bad { --wave-a: var(--destructive); --wave-b: var(--chart-5); --wave-fill: var(--destructive); }
+  .wave-muted { --wave-a: var(--muted-foreground); --wave-b: var(--muted-foreground); --wave-fill: var(--muted-foreground); }
+
+  .neu {
+    background-image: linear-gradient(
+      150deg,
+      color-mix(in oklab, var(--card) 94%, white),
+      color-mix(in oklab, var(--card) 90%, var(--background))
+    );
+    border-color: color-mix(in oklab, var(--border) 55%, transparent);
+    box-shadow: var(--sh-neu);
+  }
+
+  .neu-sm {
+    background-image: linear-gradient(
+      150deg,
+      color-mix(in oklab, var(--card) 94%, white),
+      color-mix(in oklab, var(--card) 90%, var(--background))
+    );
+    box-shadow: var(--sh-neu-sm);
+  }
+
+  /* 列表行：一屏几十行，投影半径比卡片小得多（10px vs 22px），
+     模糊半径的绘制开销随半径平方增长，滚动时差别很明显 */
+  .neu-row {
+    background-image: linear-gradient(
+      150deg,
+      color-mix(in oklab, var(--card) 94%, white),
+      color-mix(in oklab, var(--card) 90%, var(--background))
+    );
+    border-color: color-mix(in oklab, var(--border) 55%, transparent);
+    box-shadow: var(--sh-neu-sm);
+  }
+
+  .neu-inset {
+    background: color-mix(in oklab, var(--muted) 88%, transparent);
+    box-shadow: var(--sh-inset);
+  }
+
+  /* 微拟物凹陷轨道：搜索框 / 下拉 / 顶栏按钮 / 卡片内信息栏共用同一套凹陷语言 */
+  .neu-track {
+    background-color: color-mix(in oklab, var(--muted) 88%, transparent);
+    border-color: color-mix(in oklab, var(--border) 60%, transparent);
+    box-shadow: var(--sh-inset);
+  }
+
+  .neu-press {
+    transition: box-shadow 0.15s ease, transform 0.15s ease, color 0.15s ease;
+  }
+  .neu-press:active {
+    box-shadow: var(--sh-inset);
+    transform: translateY(1px);
+  }
+
+  .glass {
+    background: color-mix(in oklab, var(--card) 68%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.35);
+    backdrop-filter: blur(18px) saturate(1.35);
+  }
+
+  .glass-soft {
+    background: color-mix(in oklab, var(--card) 45%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    backdrop-filter: blur(14px) saturate(1.3);
+  }
+
+  .map-dot {
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+
+  .cv-card {
+    content-visibility: auto;
+    /* 同样不要加 auto 关键字，理由见下面 .cv-row */
+    contain-intrinsic-size: 434px;
+  }
+
+  .cv-row {
+    content-visibility: auto;
+    /* 用固定值，别加 auto 关键字：auto 会把「上次渲染的尺寸」记下来当固定尺寸用，
+       某次渲染偏高（例如样式未就绪的那一帧）之后就会一直偏大——
+       实测行被撑到 84px（真实内容只有 62px），行进出视口时反复改高，
+       既是滚动抖动与掉帧的来源，也会白白多占 22px 行距 */
+    contain-intrinsic-size: 62px;
+  }
+
+  .text-gradient {
+    background-image: linear-gradient(100deg, var(--primary), var(--info));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glow-hover {
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease, background-color 0.25s ease;
+  }
+  .glow-hover:hover {
+    box-shadow: var(--sh-neu), 0 20px 48px -26px color-mix(in oklab, var(--primary) 60%, transparent);
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes ping-soft {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 45%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in oklab, var(--ok) 0%, transparent); }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.pulse-ok { animation: ping-soft 2.4s ease-out infinite; }
+.rise { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ok, .rise { animation: none; }
+}
