@@ -41,7 +41,7 @@ const Land = memo(function Land() {
   )
 })
 
-export function NodeMap({
+function NodeMapBase({
   nodes,
   onOpen,
   className,
@@ -171,7 +171,7 @@ export function NodeMap({
         {active && (
           <div
             ref={popRef}
-            className="absolute inset-x-1 bottom-1 rounded-xl border border-border/70 bg-popover/95 p-1.5 shadow-lg backdrop-blur-sm"
+            className="absolute inset-x-1 bottom-1 rounded-xl border border-border/70 bg-popover/95 p-1.5 shadow-lg"
           >
             <div className="flex items-center justify-between gap-2 px-1.5 pb-1 text-[11px] text-muted-foreground">
               <span className="truncate">
@@ -212,3 +212,15 @@ export function NodeMap({
     </div>
   )
 }
+
+/** 地图只关心地区、在线状态与名称：指标每 2 秒都在变，地图不必跟着重算投影 */
+export const NodeMap = memo(NodeMapBase, (a, b) => {
+  if (a.nodes === b.nodes) return true
+  if (a.nodes.length !== b.nodes.length) return false
+  for (let i = 0; i < a.nodes.length; i++) {
+    const x = a.nodes[i]
+    const y = b.nodes[i]
+    if (x.id !== y.id || x.country !== y.country || x.online !== y.online || x.name !== y.name) return false
+  }
+  return true
+})

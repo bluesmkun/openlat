@@ -1,12 +1,13 @@
+import { memo } from "react"
 import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react"
 
-import { CountryLabel, ExpiryText, LatencyMini, MiniBar, PriceText, StatusDot } from "@/components/Bits"
+import { CountryLabel, ExpiryText, LatencyMini, MiniBar, OsIcon, PriceText, StatusDot } from "@/components/Bits"
 import type { Latency, Node } from "@/lib/api"
-import { bytes, FOREVER, osName, percent, rate } from "@/lib/format"
+import { bytes, FOREVER, percent, rate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { monthUsage } from "@/lib/view"
 
-export function NodeRow({ node, latency, onOpen }: { node: Node; latency?: Latency; onOpen: () => void }) {
+function NodeRowBase({ node, latency, onOpen }: { node: Node; latency?: Latency; onOpen: () => void }) {
   const m = node.metrics
   const used = monthUsage(node)
   const trafficPct = node.traffic_limit > 0 ? percent(used, node.traffic_limit) : null
@@ -23,9 +24,9 @@ export function NodeRow({ node, latency, onOpen }: { node: Node; latency?: Laten
       className="glow-hover cv-row group flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border neu-row px-3 py-2.5 hover:border-primary/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
     >
       {/* 名称列给固定宽度：宽度一旦随名称长短变化，后面各列的起点就会逐行错位。
-          剩余空间交给系统版本 / 流量 / 延迟三列按比例吸收，既不会在名称后留大洞，
-          行与行之间的列也严格对齐 */}
-      <div className="flex w-48 min-w-0 shrink-0 items-center gap-2">
+          系统列只留一个图标，流量列固定宽度，剩余空间统一交给延迟列——
+          右侧几列因此都能拿到确定的宽度，不会再挤在一起 */}
+      <div className="flex w-44 min-w-0 shrink-0 items-center gap-2">
         <StatusDot node={node} />
         <CountryLabel code={node.country} className="shrink-0" />
         <span className="truncate text-sm font-medium" title={node.name}>
@@ -33,11 +34,8 @@ export function NodeRow({ node, latency, onOpen }: { node: Node; latency?: Laten
         </span>
       </div>
 
-      <span
-        className="hidden min-w-24 max-w-44 flex-1 truncate text-xs text-muted-foreground md:block"
-        title={node.os ? osName(node.os) : "等待首次上报"}
-      >
-        {node.os ? osName(node.os) : "等待首次上报"}
+      <span className="hidden shrink-0 md:block">
+        <OsIcon os={node.os} />
       </span>
 
       <MiniBar className="hidden md:flex" label="CPU" tone="cpu" pct={m ? m.cpu : null} value={m ? `${m.cpu.toFixed(0)}%` : "—"} />
@@ -45,7 +43,7 @@ export function NodeRow({ node, latency, onOpen }: { node: Node; latency?: Laten
       <MiniBar className="hidden lg:flex" label="硬盘" tone="disk" pct={diskPct} value={diskPct === null ? "—" : `${diskPct.toFixed(0)}%`} />
 
       <div
-        className="hidden min-w-36 flex-1 lg:block"
+        className="hidden w-36 shrink-0 lg:block xl:w-44"
         title={`本月已用 ${bytes(used)}${node.traffic_limit > 0 ? ` / ${bytes(node.traffic_limit)}` : " · 不限流量"}`}
       >
         <div className="flex items-baseline justify-between gap-2 text-[11px] leading-4">
@@ -99,3 +97,6 @@ export function NodeRow({ node, latency, onOpen }: { node: Node; latency?: Laten
     </div>
   )
 }
+
+/** 节点对象与延迟数据都没变时跳过重绘：2 秒一次的推送只更新真正变化的行 */
+export const NodeRow = memo(NodeRowBase, (a, b) => a.node === b.node && a.latency === b.latency)

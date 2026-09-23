@@ -27,14 +27,13 @@ function useNodeRoute() {
     addEventListener("popstate", sync)
     return () => removeEventListener("popstate", sync)
   }, [])
-  return [
-    id,
-    (next: number | null) => {
-      history.pushState({}, "", next === null ? "/" : `/node/${next}`)
-      setId(next)
-      scrollTo(0, 0)
-    },
-  ] as const
+  // 引用稳定，卡片 / 列表行的 memo 才不会被一个每次渲染都新建的回调击穿
+  const go = useCallback((next: number | null) => {
+    history.pushState({}, "", next === null ? "/" : `/node/${next}`)
+    setId(next)
+    scrollTo(0, 0)
+  }, [])
+  return [id, go] as const
 }
 
 function useTheme() {

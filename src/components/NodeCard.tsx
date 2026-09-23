@@ -1,3 +1,4 @@
+import { memo } from "react"
 import {
   ArrowDown,
   ArrowDownUp,
@@ -22,7 +23,7 @@ const RISK_TEXT: Record<Exclude<ExpiryRisk, "none">, string> = {
   critical: "text-destructive",
 }
 
-export function NodeCard({ node, latency, onOpen }: { node: Node; latency?: Latency; onOpen: () => void }) {
+function NodeCardBase({ node, latency, onOpen }: { node: Node; latency?: Latency; onOpen: () => void }) {
   const m = node.metrics
   const status = statusOf(node)
   const used = monthUsage(node)
@@ -152,3 +153,6 @@ export function NodeCard({ node, latency, onOpen }: { node: Node; latency?: Late
     </Card>
   )
 }
+
+/** 节点对象与延迟数据都没变时跳过重绘：2 秒一次的推送只更新真正变化的卡片 */
+export const NodeCard = memo(NodeCardBase, (a, b) => a.node === b.node && a.latency === b.latency)

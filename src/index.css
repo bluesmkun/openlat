@@ -232,6 +232,10 @@
     background-color: var(--heat-bad);
     background-image: linear-gradient(165deg, color-mix(in oklab, var(--heat-bad) 82%, white), var(--heat-bad));
   }
+  /* 列表里一屏十几行、每行 48 格，省略外投影只留顶部高光，滚动时省掉大量重绘 */
+  .heat-cell-flat {
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.35);
+  }
   .heat-muted {
     background-color: var(--heat-muted);
     box-shadow: inset 0 1px 3px oklch(0.35 0.03 275 / 0.18);
@@ -239,6 +243,9 @@
   .heat-muted:hover {
     transform: none;
     filter: none;
+  }
+  .dark .heat-cell-flat {
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.1);
   }
   .dark .heat-cell {
     box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14), 0 1px 2px oklch(0 0 0 / 0.45);
@@ -316,8 +323,9 @@
 
   .cv-card {
     content-visibility: auto;
-    /* 同样不要加 auto 关键字，理由见下面 .cv-row */
-    contain-intrinsic-size: 434px;
+    /* 同样不要加 auto 关键字，理由见下面 .cv-row；
+       数值按 1440 宽三列时的实测高度校准，改动卡片内容后记得复测 */
+    contain-intrinsic-size: 426px;
   }
 
   .cv-row {
@@ -345,9 +353,11 @@
   }
 }
 
+/* 在线圆点的呼吸光晕放在伪元素上，只动 transform / opacity，
+   交给合成器；box-shadow 动画会每帧重绘，节点一多就是掉帧大户 */
 @keyframes ping-soft {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 45%, transparent); }
-  50% { box-shadow: 0 0 0 5px color-mix(in oklab, var(--ok) 0%, transparent); }
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(2.6); opacity: 0; }
 }
 
 @keyframes rise {
@@ -355,9 +365,18 @@
   to { opacity: 1; transform: none; }
 }
 
-.pulse-ok { animation: ping-soft 2.4s ease-out infinite; }
+.pulse-ok { position: relative; }
+.pulse-ok::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--ok) 62%, transparent);
+  animation: ping-soft 2.4s ease-out infinite;
+}
+
 .rise { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-ok, .rise { animation: none; }
+  .pulse-ok::after, .rise { animation: none; }
 }

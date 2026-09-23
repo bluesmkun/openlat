@@ -106,6 +106,36 @@ export function safeNodes(nodes: Node[]): Node[] {
   })
 }
 
+function sameMetrics(a: Metrics | null, b: Metrics | null): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  for (const key in a) {
+    if (key === "load") continue
+    if (a[key as keyof Metrics] !== b[key as keyof Metrics]) return false
+  }
+  return a.load[0] === b.load[0] && a.load[1] === b.load[1] && a.load[2] === b.load[2]
+}
+
+function sameNode(a: Node, b: Node): boolean {
+  if (a === b) return true
+  for (const key in a) {
+    if (key === "metrics") continue
+    if (a[key as keyof Node] !== b[key as keyof Node]) return false
+  }
+  return sameMetrics(a.metrics, b.metrics)
+}
+
+/** 每 2 秒的快照里，字段没变的节点沿用旧对象；配合卡片 / 列表行的 memo，
+ *  一次推送只重绘真正有变化的节点 */
+function reconcile(prev: Node[] | null, next: Node[]): Node[] {
+  if (!prev || prev.length === 0) return next
+  const old = new Map(prev.map((node) => [node.id, node]))
+  return next.map((node) => {
+    const before = old.get(node.id)
+    return before && sameNode(before, node) ? before : node
+  })
+}
+
 export function useNodes() {
   const [nodes, setNodes] = useState<Node[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -120,7 +150,7 @@ export function useNodes() {
     const receive = (list: Node[]) => {
       const safe = safeNodes(list)
       sample(safe)
-      setNodes(safe)
+      setNodes((prev) => reconcile(prev, safe))
       setError(null)
       setClosed(false)
     }
@@ -393,7 +423,7 @@ export function useLatency(nodes: Node[] | null): LatencyMap {
       while (running < CONCURRENCY && queue.length > 0) {
         const id = queue.shift()!
         running++
-        fetchHistory(id, 24, "ping", 288)
+        fetchHistory(id, 24, "ping", 96)
           .then((history) => {
             if (!stopped) setStats((s) => ({ ...s, [id]: summarizePing(history) }))
           })

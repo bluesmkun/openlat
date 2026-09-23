@@ -1,5 +1,5 @@
 import { memo, useState, type ComponentType, type ReactNode } from "react"
-import { Activity } from "lucide-react"
+import { Activity, Apple, LayoutGrid, Server, SquareTerminal } from "lucide-react"
 
 import { Badge, type BadgeVariant } from "@/components/ui/badge"
 import { HOUR_BUCKETS, type Latency, type LatencyHour, type Node, type ProbeStat } from "@/lib/api"
@@ -14,6 +14,7 @@ import {
   jitterTone,
   latencyTone,
   money,
+  osName,
   uptime,
   type Tone,
 } from "@/lib/format"
@@ -159,6 +160,24 @@ export function CountryLabel({ code, name = false, className }: { code: string; 
   )
 }
 
+const WINDOWS = /windows|wsl/i
+const MACOS = /mac|darwin|ios|os x/i
+const UNIX = /linux|debian|ubuntu|centos|alma|rocky|fedora|arch|alpine|suse|gentoo|openwrt|bsd|unix/i
+
+/** 列表视图的系统列：只画一个图标，完整版本名放进 title，省下整列文字宽度 */
+export function OsIcon({ os, className }: { os: string; className?: string }) {
+  const label = os ? osName(os) : "等待首次上报"
+  const Icon = WINDOWS.test(label) ? LayoutGrid : MACOS.test(label) ? Apple : UNIX.test(label) ? SquareTerminal : Server
+  return (
+    <span
+      title={label}
+      className={cn("grid size-5 shrink-0 place-items-center rounded-md bg-muted/60 text-muted-foreground", className)}
+    >
+      <Icon className="size-3" />
+    </span>
+  )
+}
+
 export function bandProbe(latency?: Latency): ProbeStat | null {
   if (!latency || latency.none || latency.failed) return null
   return latency.probes.find((p) => p.latency !== null) ?? null
@@ -231,7 +250,7 @@ function HeatTrack({
   compact?: boolean
   className?: string
 }) {
-  const cell = cn("heat-cell min-w-0 flex-1", compact ? "rounded-[2px]" : "rounded-[3px]")
+  const cell = cn("min-w-0 flex-1", compact ? "heat-cell-flat rounded-[2px]" : "heat-cell rounded-[3px]")
   const gap = (i: number) => (i > 0 && i % 6 === 0 ? (compact ? "ml-[2px]" : "ml-[3px]") : "")
   return (
     <span className={cn("flex min-w-0 items-stretch", compact ? "gap-[1px]" : "gap-[1.5px]", className)}>
