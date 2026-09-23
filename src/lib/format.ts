@@ -122,12 +122,6 @@ export function lossTone(pct: number): Tone {
   return pct <= 0 ? "ok" : pct < 5 ? "warn" : "bad"
 }
 
-export function expiryTone(days: number | null): Tone {
-  if (days === null) return "muted"
-  if (days < 0) return "bad"
-  return days <= 7 ? "warn" : "ok"
-}
-
 /** 到期风险分级：none = 还早或永不到期，soon = 30 天内，critical = 7 天内或已过期 */
 export type ExpiryRisk = "none" | "soon" | "critical"
 
@@ -135,6 +129,14 @@ export function expiryRisk(days: number | null): ExpiryRisk {
   if (days === null) return "none"
   if (days < 0 || days <= 7) return "critical"
   return days <= 30 ? "soon" : "none"
+}
+
+/** 到期颜色三档，卡片与列表共用同一套阈值（见 expiryRisk）：≤7 天或已过期红，
+ *  ≤30 天琥珀，其余绿，永不到期中性 */
+export function expiryTone(days: number | null): Tone {
+  if (days === null) return "muted"
+  const risk = expiryRisk(days)
+  return risk === "critical" ? "bad" : risk === "soon" ? "warn" : "ok"
 }
 
 const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720, 1440, 2880, 10080].map((m) => m * 60_000)

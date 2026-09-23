@@ -13,22 +13,15 @@ import { CountryLabel, ExpiryText, LatencyPanel, PriceText, StatusPill } from "@
 import { Meter } from "@/components/Meter"
 import { Card } from "@/components/ui/card"
 import type { Latency, Node } from "@/lib/api"
-import { bytes, daysUntil, expiryRisk, FOREVER, osName, pair, percent, rate, type ExpiryRisk } from "@/lib/format"
+import { bytes, FOREVER, osName, pair, percent, rate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { deployed, monthUsage, statusOf } from "@/lib/view"
-
-/** 到期风险只体现在文字颜色上，轨道底色保持固定，避免卡片里出现太多色块 */
-const RISK_TEXT: Record<Exclude<ExpiryRisk, "none">, string> = {
-  soon: "text-warn",
-  critical: "text-destructive",
-}
 
 function NodeCardBase({ node, latency, onOpen }: { node: Node; latency?: Latency; onOpen: () => void }) {
   const m = node.metrics
   const status = statusOf(node)
   const used = monthUsage(node)
   const trafficPct = node.traffic_limit > 0 ? percent(used, node.traffic_limit) : null
-  const risk = expiryRisk(daysUntil(node.expires_at))
 
   return (
     <Card
@@ -106,10 +99,8 @@ function NodeCardBase({ node, latency, onOpen }: { node: Node; latency?: Latency
                 <CalendarClock className="size-3.5" />
                 到期
               </span>
-              <ExpiryText
-                date={node.expires_at}
-                className={cn("text-[13px] font-semibold", risk !== "none" && RISK_TEXT[risk])}
-              />
+              {/* 颜色统一由 ExpiryText 内部按 expiryRisk 判定，卡片与列表不会再出现两套阈值 */}
+              <ExpiryText date={node.expires_at} className="text-[13px] font-semibold" />
             </div>
 
             <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
