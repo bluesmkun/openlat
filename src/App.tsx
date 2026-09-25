@@ -254,7 +254,7 @@ export default function App() {
           </>
         )}
 
-        <Footer me={me} nodes={nodes} />
+        <Footer me={me} />
       </main>
     </div>
   )
