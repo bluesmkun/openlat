@@ -332,9 +332,17 @@
     content-visibility: auto;
     /* 用固定值，别加 auto 关键字：auto 会把「上次渲染的尺寸」记下来当固定尺寸用，
        某次渲染偏高（例如样式未就绪的那一帧）之后就会一直偏大——
-       实测行被撑到 84px（真实内容只有 62px），行进出视口时反复改高，
-       既是滚动抖动与掉帧的来源，也会白白多占 22px 行距 */
-    contain-intrinsic-size: 62px;
+       行进出视口时反复改高，既是滚动抖动与掉帧的来源，也会白白多占行距。
+       另外这个值是内容盒高度（Chromium 不含 padding 与边框），行总高 = 值 + 22px；
+       数值按列表布局刷新后实测校准：xl 下内容 47px（行高 69px） */
+    contain-intrinsic-size: 47px;
+  }
+
+  /* 手机上系统行与资源列收起后，行内容只剩名称列，内容盒实测 40px */
+  @media (max-width: 767px) {
+    .cv-row {
+      contain-intrinsic-size: 40px;
+    }
   }
 
   .text-gradient {
