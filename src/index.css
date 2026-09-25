@@ -338,10 +338,17 @@
     contain-intrinsic-size: 47px;
   }
 
-  /* 手机上系统行与资源列收起后，行内容只剩名称列，内容盒实测 40px */
-  @media (max-width: 767px) {
+  /* 小于 lg 时网络行收起、内容盒实测 42px */
+  @media (max-width: 1023px) {
     .cv-row {
-      contain-intrinsic-size: 40px;
+      contain-intrinsic-size: 42px;
+    }
+  }
+
+  /* 手机上只剩名称与资源两段上下堆叠（40 + 6 + 42），内容盒实测 88px */
+  @media (max-width: 639px) {
+    .cv-row {
+      contain-intrinsic-size: 88px;
     }
   }
 
