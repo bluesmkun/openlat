@@ -3,6 +3,7 @@ import { Activity, Moon, SearchX, Sun, Wrench } from "lucide-react"
 
 import { NodeCard } from "@/components/NodeCard"
 import { CountryLabel } from "@/components/Bits"
+import { Footer } from "@/components/Footer"
 import { NodeRow } from "@/components/NodeRow"
 import { Summary } from "@/components/Summary"
 import { Toolbar } from "@/components/Toolbar"
@@ -252,6 +253,8 @@ export default function App() {
             )}
           </>
         )}
+
+        <Footer me={me} nodes={nodes} />
       </main>
     </div>
   )
