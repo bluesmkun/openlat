@@ -6,15 +6,16 @@ import { HOUR_BUCKETS, type Latency, type LatencyHour, type Node, type ProbeStat
 import { OS_ICONS } from "@/lib/os-icons"
 import {
   countryName,
-  CYCLES,
-  daysUntil,
+  cycleLabel,
   duration,
+  expiryDays,
   expiryLabel,
   expiryTone,
   flagOf,
   jitterTone,
   latencyTone,
   money,
+  offlineAgo,
   osName,
   uptime,
   type Tone,
@@ -51,7 +52,9 @@ export function statusLabel(node: Node): string {
   const status = statusOf(node)
   if (status === "online") return node.metrics ? `在线 ${uptime(node.metrics.uptime)}` : "在线"
   if (status === "offline") {
-    return node.last_seen ? `离线 ${duration(Math.max(0, Date.now() / 1000 - node.last_seen))}` : "离线"
+    // 离线时长用 hub 的 last_seen_ago，访客时钟不准也不会显示成 8 小时
+    const ago = offlineAgo(node)
+    return ago === null ? "离线" : `离线 ${duration(ago)}`
   }
   return "未接入"
 }
@@ -391,16 +394,17 @@ export function LatencyMini({ latency, className }: { latency?: Latency; classNa
   )
 }
 
+/** 到期天数用 hub 算好的 expires_in，见 format.ts 的 expiryDays；不拿浏览器时钟自己算 */
 export function ExpiryText({
-  date,
+  node,
   compact = false,
   className,
 }: {
-  date?: string | null
+  node: Node
   compact?: boolean
   className?: string
 }) {
-  const days = daysUntil(date)
+  const days = expiryDays(node)
   if (days === null) {
     return (
       <span className={cn("tnum text-muted-foreground", className)} title="永不到期">
@@ -409,7 +413,7 @@ export function ExpiryText({
     )
   }
   return (
-    <span className={cn("tnum", TONE_TEXT[expiryTone(days)], className)} title={date ?? "永不到期"}>
+    <span className={cn("tnum", TONE_TEXT[expiryTone(days)], className)} title={node.expires_at ?? "永不到期"}>
       {compact ? (days < 0 ? `过期${-days}天` : `${days}天`) : expiryLabel(days)}
     </span>
   )
@@ -417,11 +421,10 @@ export function ExpiryText({
 
 export function PriceText({ node, className }: { node: Node; className?: string }) {
   if (node.price <= 0) return <span className={cn("text-muted-foreground", className)}>免费</span>
-  const cycle = CYCLES[node.billing_cycle] ?? node.billing_cycle
   return (
     <span className={cn("tnum", className)}>
       {money(node.price, node.currency)}
-      {cycle && <span className="text-muted-foreground"> / {cycle}</span>}
+      <span className="text-muted-foreground"> / {cycleLabel(node.billing_cycle)}</span>
     </span>
   )
 }

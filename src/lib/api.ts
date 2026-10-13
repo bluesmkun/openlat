@@ -31,7 +31,13 @@ export type Node = {
   online: boolean
   country: string
   last_seen: number
+  /** hub 时钟算出的距最后上报秒数；旧版 hub 没有这个 key */
+  last_seen_ago?: number | null
   metrics: Metrics | null
+  /** 站长在面板上设的分组名，旧版 hub 没有这个 key */
+  group?: string
+  /** 站长写给访客的公开备注，最长 100 字，纯文本 */
+  public_remark?: string
   os: string
   kernel: string
   arch: string
@@ -46,6 +52,8 @@ export type Node = {
   currency: string
   billing_cycle: string
   expires_at: string | null
+  /** hub 时钟算出的剩余天数：0 今天到期、负数已过期、null 没有到期日；旧版 hub 没有这个 key */
+  expires_in?: number | null
   traffic_limit: number
   traffic_mode: string
   traffic_reset_day: number
@@ -66,6 +74,8 @@ export type Me = {
   github: boolean
   site_name: string
   public_page: boolean
+  /** 站长设置的历史保留天数（1–365）；旧版 hub 没有这个 key，按 7 天处理 */
+  history_days?: number
 }
 
 export class ApiError extends Error {
@@ -76,13 +86,36 @@ export class ApiError extends Error {
   }
 }
 
+/** 非 text/plain 的出错回复（反代 / CDN 页面）不显示原文，按状态码给一句说明 */
+function statusHint(status: number): string {
+  if (status === 401) return "需要登录后查看"
+  if (status === 404) return "请求的内容不存在"
+  if (status === 503) return "服务暂时不可用，请稍后重试"
+  return `请求失败（HTTP ${status}）`
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    ...init,
-    headers: init?.body ? { "content-type": "application/json", ...init?.headers } : init?.headers,
-  })
-  if (!res.ok) throw new ApiError(res.status, (await res.text()) || res.statusText)
-  return res.status === 204 ? (undefined as T) : res.json()
+  let res: Response
+  try {
+    res = await fetch(`/api${path}`, {
+      ...init,
+      headers: init?.body ? { "content-type": "application/json", ...init?.headers } : init?.headers,
+    })
+  } catch {
+    throw new ApiError(0, "网络请求失败，请检查网络后重试")
+  }
+  if (!res.ok) {
+    // hub 的错误是一行中文纯文本，可以原样给访客；其它来源的按状态码说明
+    const type = res.headers.get("content-type") ?? ""
+    const text = type.startsWith("text/plain") ? (await res.text()).trim() : ""
+    throw new ApiError(res.status, text || statusHint(res.status))
+  }
+  if (res.status === 204) return undefined as T
+  try {
+    return (await res.json()) as T
+  } catch {
+    throw new ApiError(res.status, statusHint(res.status))
+  }
 }
 
 const KEEP = 60
@@ -178,8 +211,10 @@ export function useNodes() {
     let poll: ReturnType<typeof setInterval> | null = null
     let retry: ReturnType<typeof setTimeout> | null = null
     let stopped = false
+    let hidden = document.hidden
     let hasData = false
     let pending: Node[] | null = null
+    let lastFrame = 0
 
     const commit = (list: Node[]) => {
       hasData = true
@@ -203,17 +238,50 @@ export function useNodes() {
       commit(list)
     })
 
+    // 页面切到后台时挂起前发出的请求，结果回来时已经不在前台，一律丢弃
     const fetchOnce = () =>
       api<{ nodes: Node[] }>("/nodes")
-        .then((d) => receive(d.nodes))
+        .then((d) => {
+          if (!hidden) receive(d.nodes)
+        })
         .catch((e: Error) => {
+          if (hidden) return
           setError(e.message)
           if (e instanceof ApiError && e.status === 401) setClosed(true)
         })
 
     fetchOnce()
 
-    const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws`
+    // 有 DecompressionStream 时向 hub 要 gzip 帧：100 台在线一帧约 110 KB，压缩后约 15 KB。
+    // 旧版 hub 忽略参数照发文本帧，两种帧都要能收
+    const gzip = typeof DecompressionStream === "function" ? "?gzip" : ""
+    const scheme = location.protocol === "https:" ? "wss" : "ws"
+    const url = `${scheme}://${location.host}/api/ws${gzip}`
+
+    const frameText = (data: string | Blob): Promise<string> => {
+      if (typeof data === "string") return Promise.resolve(data)
+      const plain = data.stream().pipeThrough(new DecompressionStream("gzip"))
+      return new Response(plain).text()
+    }
+
+    // 解压是异步的，后到的帧可能先解完，一帧接一帧地处理
+    let decoded: Promise<void> = Promise.resolve()
+    const handleFrame = (event: MessageEvent) => {
+      decoded = decoded
+        .then(async () => {
+          const { nodes } = JSON.parse(await frameText(event.data as string | Blob)) as { nodes: Node[] }
+          // 连接关闭或页面切走之后才解完的帧丢掉；只有完整解开的帧才重置断流计时
+          if (socket?.readyState !== WebSocket.OPEN || hidden) return
+          lastFrame = Date.now()
+          receive(nodes)
+          if (poll) {
+            clearInterval(poll)
+            poll = null
+          }
+        })
+        .catch((e: unknown) => console.warn(e))
+    }
+
     const connect = () => {
       try {
         socket = new WebSocket(url)
@@ -221,25 +289,49 @@ export function useNodes() {
         poll ??= setInterval(fetchOnce, 5000)
         return
       }
-      socket.onmessage = (event) => {
-        receive(JSON.parse(event.data).nodes)
-        if (poll) {
-          clearInterval(poll)
-          poll = null
-        }
-      }
+      socket.onmessage = handleFrame
       socket.onerror = () => socket?.close()
       socket.onclose = () => {
-        if (stopped) return
+        socket = null
+        if (stopped || hidden) return
+        // 握手被拒（例如匿名连接数已满回 503）或断流：先退回轮询，过一会儿再试 WebSocket
         poll ??= setInterval(fetchOnce, 5000)
         retry = setTimeout(connect, 5000)
       }
     }
     connect()
 
+    // 连接还挂着却不再推帧（手机挂起、中间设备静默掐断）时主动断开走重连；
+    // 计时只在解开的帧里重置，一直收到解不开的帧同样当作断流
+    const watchdog = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN && lastFrame > 0 && Date.now() - lastFrame > 30_000)
+        socket.close()
+    }, 10_000)
+
+    const onVisibility = () => {
+      hidden = document.hidden
+      if (hidden) {
+        socket?.close()
+        if (poll) {
+          clearInterval(poll)
+          poll = null
+        }
+        if (retry) {
+          clearTimeout(retry)
+          retry = null
+        }
+      } else {
+        fetchOnce()
+        if (!socket || socket.readyState > WebSocket.OPEN) connect()
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+
     return () => {
       stopped = true
       offIdle()
+      document.removeEventListener("visibilitychange", onVisibility)
+      clearInterval(watchdog)
       socket?.close()
       if (poll) clearInterval(poll)
       if (retry) clearTimeout(retry)

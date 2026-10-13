@@ -25,9 +25,9 @@ import {
   bytes,
   clockFor,
   cpuName,
-  CYCLES,
-  daysUntil,
+  cycleLabel,
   duration,
+  expiryDays,
   expiryLabel,
   FOREVER,
   jitterTone,
@@ -45,13 +45,6 @@ import {
 import { cn } from "@/lib/utils"
 import { monthUsage } from "@/lib/view"
 
-const RANGES = [
-  { hours: 1, label: "1 小时" },
-  { hours: 6, label: "6 小时" },
-  { hours: 24, label: "24 小时" },
-  { hours: 168, label: "7 天" },
-]
-
 const TABS = [
   { key: "resources", label: "资源" },
   { key: "latency", label: "网络延迟" },
@@ -59,9 +52,14 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"]
 
-const RANGES_FOR: Record<TabKey, typeof RANGES> = {
-  resources: RANGES,
-  latency: RANGES.filter((r) => r.hours <= 24),
+/** 时间范围按 hub 的保留天数生成，不写死：整档位取保留期的四分之三以内的，
+ *  最后加上保留期本身；保留期比某个整档位多不到四分之一时去掉那一档 */
+const WINDOWS = [1, 6, 24, 168, 720, 2160]
+
+export function windowsFor(historyDays: number): { hours: number; label: string }[] {
+  const whole = Math.max(24, Math.round(historyDays * 24))
+  const hours = [...WINDOWS.filter((h) => h * 1.25 <= whole), whole]
+  return hours.map((h) => ({ hours: h, label: h >= 168 && h % 24 === 0 ? `${h / 24} 天` : `${h} 小时` }))
 }
 
 const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
@@ -143,10 +141,25 @@ function movingAverage(points: PingPoint[], window = 5): (number | null)[] {
   })
 }
 
-export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: Latency; onBack: () => void }) {
+export function NodeDetail({
+  node,
+  latency,
+  onBack,
+  historyDays = 7,
+}: {
+  node: Node
+  latency?: Latency
+  onBack: () => void
+  historyDays?: number
+}) {
   const [tab, setTab] = useState<TabKey>("resources")
   const [ranges, setRanges] = useState<Record<TabKey, number>>({ resources: 6, latency: 6 })
   const hours = ranges[tab]
+  const windows = useMemo(() => windowsFor(historyDays), [historyDays])
+  const windowsForTab = useMemo<Record<TabKey, typeof windows>>(
+    () => ({ resources: windows, latency: windows.filter((r) => r.hours <= 24) }),
+    [windows],
+  )
   const [smooth, setSmooth] = useState(false)
   const [smoothLine, setSmoothLine] = useState(true)
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
@@ -258,7 +271,10 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
   })
 
   const used = monthUsage(node)
-  const cycle = CYCLES[node.billing_cycle] ?? node.billing_cycle
+  const cycle = cycleLabel(node.billing_cycle)
+  const expiry = expiryDays(node)
+  // 站长登录时看到私有备注；访客看到公开备注。节点上报的字符串按纯文本渲染
+  const note = node.remark || node.public_remark
   const groups: FactGroup[] = []
   const group = (label: string, icon: IconType) => {
     const facts: FactRow[] = []
@@ -293,10 +309,10 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
   // 到期文字沿用 ExpiryText：详情页与卡片 / 列表共用同一套颜色阈值
   billing(
     "到期",
-    node.expires_at ? `${node.expires_at} · ${expiryLabel(daysUntil(node.expires_at))}` : "永不到期",
-    node.expires_at ? (
+    expiry !== null ? `${node.expires_at} · ${expiryLabel(expiry)}` : "永不到期",
+    expiry !== null ? (
       <>
-        {node.expires_at} · <ExpiryText date={node.expires_at} />
+        {node.expires_at} · <ExpiryText node={node} />
       </>
     ) : (
       <span className="text-muted-foreground">永不到期</span>
@@ -369,7 +385,7 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
             ))}
           </div>
           <div className="neu-inset flex items-center gap-0.5 rounded-lg p-0.5">
-            {RANGES_FOR[tab].map((r) => (
+            {windowsForTab[tab].map((r) => (
               <Tab key={r.hours} active={hours === r.hours} onClick={() => setRanges((all) => ({ ...all, [tab]: r.hours }))}>
                 {r.label}
               </Tab>
@@ -687,8 +703,8 @@ export function NodeDetail({ node, latency, onBack }: { node: Node; latency?: La
             ))}
         </div>
 
-        {node.remark && (
-          <p className="rounded-xl border bg-muted/40 px-3 py-2 text-sm whitespace-pre-wrap">{node.remark}</p>
+        {note && (
+          <p className="rounded-xl border bg-muted/40 px-3 py-2 text-sm whitespace-pre-wrap">{note}</p>
         )}
       </div>
     </div>

@@ -7,6 +7,7 @@ import { GROUP_KEYS, type GroupKey, SORT_KEYS, type SortKey, VIEW_MODES, type Vi
 
 const GROUP_LABEL: Record<GroupKey, string> = {
   none: "不分组",
+  group: "按分组",
   country: "按地区",
   status: "按状态",
   os: "按系统",

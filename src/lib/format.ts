@@ -1,3 +1,5 @@
+import type { Node } from "./api.ts"
+
 const UNITS = ["B", "KB", "MB", "GB", "TB", "PB"]
 
 const unitOf = (n: number) => Math.min(Math.floor(Math.log(n) / Math.log(1024)), UNITS.length - 1)
@@ -50,6 +52,21 @@ export function daysUntil(date?: string | null): number | null {
   return Math.ceil((target - Date.now()) / 86400000)
 }
 
+/** 剩余天数：优先用 hub 算好的 expires_in（在线节点按 hub 时区顺延，访客时钟无关），
+ *  expires_in 为 null 表示没有到期日；旧版 hub 没有这个 key 才退回浏览器时钟 */
+export function expiryDays(node: Node): number | null {
+  if (node.expires_in !== undefined) return node.expires_in
+  return daysUntil(node.expires_at)
+}
+
+/** 距最后一次上报的秒数：优先用 hub 的 last_seen_ago（访客时钟不准也不出错），
+ *  旧版 hub 没有这个 key 才退回浏览器时钟；从未上报为 null */
+export function offlineAgo(node: Node): number | null {
+  if (node.last_seen_ago !== undefined) return node.last_seen_ago
+  if (!node.last_seen) return null
+  return Math.max(0, Date.now() / 1000 - node.last_seen)
+}
+
 export const FOREVER = "∞"
 
 export function expiryLabel(days: number | null): string {
@@ -58,10 +75,18 @@ export function expiryLabel(days: number | null): string {
   return days === 0 ? "今天到期" : `${days} 天后到期`
 }
 
-const SYMBOLS: Record<string, string> = { USD: "$", CNY: "¥", EUR: "€", GBP: "£", JPY: "¥" }
-
+/** 地区写死 zh-CN：显示不随访客的浏览器语言变；美元、港币写作 US$、HK$，不和人民币的 ¥ 混。
+ *  currency 是旧版 hub 存下的值时 Intl 会抛错，退回「代码 + 金额」 */
 export function money(amount: number, currency: string): string {
-  return `${SYMBOLS[currency] ?? ""}${amount.toFixed(2)}${SYMBOLS[currency] ? "" : ` ${currency}`}`
+  try {
+    return new Intl.NumberFormat("zh-CN", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`
+  }
 }
 
 export const CYCLES: Record<string, string> = {
@@ -72,6 +97,30 @@ export const CYCLES: Record<string, string> = {
   biennial: "两年付",
   triennial: "三年付",
   once: "一次性",
+}
+
+/** 付款周期标签：具名的七个值之外，hub 还会给 `<n>m`（n 个月，1–1200） */
+export function cycleLabel(cycle: string): string {
+  const named = CYCLES[cycle]
+  if (named) return named
+  const months = /^(\d+)m$/.exec(cycle)
+  return months ? `${months[1]} 个月` : cycle
+}
+
+/** 付款周期折算成月数；once 是 0，不认识的返回 null */
+export function cycleMonths(cycle: string): number | null {
+  if (cycle === "once") return 0
+  const months = /^(\d+)m$/.exec(cycle)
+  if (months) return Number(months[1])
+  const NAMED: Record<string, number> = {
+    monthly: 1,
+    quarterly: 3,
+    semiannual: 6,
+    yearly: 12,
+    biennial: 24,
+    triennial: 36,
+  }
+  return NAMED[cycle] ?? null
 }
 
 export function osName(name: string): string {

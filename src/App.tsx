@@ -180,6 +180,7 @@ export default function App() {
               <NodeDetail
                 node={selected}
                 latency={selected.online ? latency[selected.id] : undefined}
+                historyDays={me.history_days ?? 7}
                 onBack={() => go(null)}
               />
             </Suspense>

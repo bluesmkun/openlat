@@ -1,11 +1,11 @@
 import type { Node } from "./api.ts"
-import { countryName, daysUntil, monthUsed, osName } from "./format.ts"
+import { countryName, cycleMonths, expiryDays, monthUsed, osName } from "./format.ts"
 
 export type ViewMode = "grid" | "list"
 export const VIEW_MODES = ["grid", "list"] as const
 
-export type GroupKey = "none" | "country" | "status" | "os"
-export const GROUP_KEYS = ["none", "country", "status", "os"] as const
+export type GroupKey = "none" | "group" | "country" | "status" | "os"
+export const GROUP_KEYS = ["none", "group", "country", "status", "os"] as const
 
 export type SortKey = "default" | "name" | "cpu" | "mem" | "traffic" | "expiry"
 export const SORT_KEYS = ["default", "name", "cpu", "mem", "traffic", "expiry"] as const
@@ -25,21 +25,12 @@ export function monthUsage(node: Node): number {
   return monthUsed(node.month_rx, node.month_tx, node.traffic_mode)
 }
 
-const MONTHS: Record<string, number> = {
-  monthly: 1,
-  quarterly: 3,
-  semiannual: 6,
-  yearly: 12,
-  biennial: 24,
-  triennial: 36,
-}
-
 export type Spend = { currency: string; amount: number }
 
 export function monthlySpend(nodes: Node[]): Spend[] {
   const totals = new Map<string, number>()
   for (const node of nodes) {
-    const months = MONTHS[node.billing_cycle]
+    const months = cycleMonths(node.billing_cycle)
     if (!months || node.price <= 0) continue
     const currency = node.currency || "USD"
     totals.set(currency, (totals.get(currency) ?? 0) + node.price / months)
@@ -55,7 +46,8 @@ export function searchNodes(nodes: Node[], query: string): Node[] {
   return nodes.filter((n) => {
     const hay = [
       n.name, n.country, countryName(n.country), n.os, osName(n.os), n.kernel, n.arch, n.virt,
-      n.cpu_name, n.hostname, n.ip, n.remark, n.agent_version, n.billing_cycle, n.currency,
+      n.cpu_name, n.hostname, n.ip, n.remark, n.public_remark, n.group, n.agent_version,
+      n.billing_cycle, n.currency,
     ].filter(Boolean).join(" ").toLowerCase()
     return terms.every((term) => hay.includes(term))
   })
@@ -75,7 +67,7 @@ export function sortNodes(nodes: Node[], key: SortKey): Node[] {
     case "traffic":
       return list.sort((a, b) => monthUsage(b) - monthUsage(a))
     case "expiry":
-      return list.sort((a, b) => (daysUntil(a.expires_at) ?? Infinity) - (daysUntil(b.expires_at) ?? Infinity))
+      return list.sort((a, b) => (expiryDays(a) ?? Infinity) - (expiryDays(b) ?? Infinity))
     default:
       return list.sort((a, b) => a.sort - b.sort || a.id - b.id)
   }
@@ -88,6 +80,11 @@ const STATUS_LABEL: Record<Status, string> = { online: "在线", offline: "离�
 type Bucket = { key: string; label: string; code?: string }
 
 function bucketOf(node: Node, by: Exclude<GroupKey, "none">): Bucket {
+  if (by === "group") {
+    // 站长在面板上设的分组名，任意文本；带前缀避免和下面几类 key 撞车
+    const name = (node.group ?? "").trim()
+    return name ? { key: `g:${name}`, label: name } : { key: "g:", label: "未分组" }
+  }
   if (by === "country") {
     const code = (node.country || "").trim().toUpperCase()
     return code ? { key: code, label: countryName(code), code } : { key: "ZZ", label: "未知地区" }
@@ -102,6 +99,10 @@ function bucketOf(node: Node, by: Exclude<GroupKey, "none">): Bucket {
 
 export function groupNodes(nodes: Node[], by: GroupKey): Group[] {
   if (by === "none") return nodes.length > 0 ? [{ key: "all", label: "", nodes }] : []
+  // 一个分组都没有时和没有分组功能时一样，不凭空造出「未分组」
+  if (by === "group" && nodes.every((node) => !(node.group ?? "").trim())) {
+    return nodes.length > 0 ? [{ key: "all", label: "", nodes }] : []
+  }
   const buckets = new Map<string, Group>()
   for (const node of nodes) {
     const bucket = bucketOf(node, by)
@@ -114,5 +115,7 @@ export function groupNodes(nodes: Node[], by: GroupKey): Group[] {
     const order: Status[] = ["online", "offline", "pending"]
     return groups.sort((a, b) => order.indexOf(a.key as Status) - order.indexOf(b.key as Status))
   }
+  // 站长分组按节点顺序排：第一次出现的位置就是它的位置，不按名字也不按数量
+  if (by === "group") return groups
   return groups.sort((a, b) => b.nodes.length - a.nodes.length || a.label.localeCompare(b.label, "zh-Hans-CN"))
 }

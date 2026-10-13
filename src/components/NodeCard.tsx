@@ -100,7 +100,7 @@ function NodeCardBase({ node, latency, onOpen }: { node: Node; latency?: Latency
                 到期
               </span>
               {/* 颜色统一由 ExpiryText 内部按 expiryRisk 判定，卡片与列表不会再出现两套阈值 */}
-              <ExpiryText date={node.expires_at} className="text-[13px] font-semibold" />
+              <ExpiryText node={node} className="text-[13px] font-semibold" />
             </div>
 
             <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">

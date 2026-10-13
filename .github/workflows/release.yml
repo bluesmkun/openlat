@@ -12,13 +12,24 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      # 仓库里不留凭据：npm 与构建脚本在本任务里跑，只有最后的发布步骤拿到 token
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # v* tag 不可以改也不能删，和 theme.json 对不上的话面板会一直提示更新：先拦住
+      - if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          V=v$(node -p 'require("./theme.json").version')
+          [ "$GITHUB_REF_NAME" = "$V" ] || { echo "::error::tag $GITHUB_REF_NAME, theme.json $V"; exit 1; }
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run build
+      # 存档是「可安装的主题目录」而不是源码快照：dist/ 与 theme.json 并排就是 hub 在磁盘上读的布局，
+      # 面板从 GitHub 安装、从 release 更新与手动解压得到的都是同一份。preview.png 是面板的预览图，
+      # 作为元数据与 theme.json 放在一起，而不是塞进 dist/
       - run: tar czf theme.tar.gz dist theme.json preview.png
       - run: sha256sum theme.tar.gz | cut -d' ' -f1 | tee theme.tar.gz.sha256
       - if: startsWith(github.ref, 'refs/tags/')

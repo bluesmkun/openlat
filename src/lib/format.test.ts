@@ -4,12 +4,15 @@ import {
   bytes,
   countryName,
   cpuName,
+  cycleLabel,
+  cycleMonths,
   daysUntil,
   duration,
   expiryLabel,
   expiryTone,
   flagOf,
   latencyTone,
+  money,
   monthUsed,
   osName,
   pair,
@@ -98,6 +101,18 @@ eq(expiryLabel(null), "∞", "无到期日")
 eq(expiryLabel(0), "今天到期", "当天到期")
 eq(expiryLabel(12), "12 天后到期", "未来到期")
 eq(expiryLabel(-2), "已过期 2 天", "已经过期")
+eq(money(8.99, "USD"), "US$8.99", "美元写 US$，不和人民币的 ¥ 混")
+eq(money(10, "CNY"), "¥10.00", "人民币")
+eq(money(100, "JPY"), "JP¥100", "日元不留小数")
+eq(money(5, "US"), "US 5.00", "非法货币代码退回代码 + 金额")
+
+eq(cycleLabel("monthly"), "月付", "具名周期")
+eq(cycleLabel("60m"), "60 个月", "旧 hub 之外的 <n>m 周期")
+eq(cycleLabel("weird"), "weird", "不认识的周期原样显示")
+eq(cycleMonths("once"), 0, "一次性不折算月数")
+eq(cycleMonths("12m"), 12, "自定义月数")
+eq(cycleMonths("weird"), null, "不认识的周期不折算")
+
 eq(expiryTone(null), "muted", "无到期日不告警")
 eq(expiryTone(90), "ok", "30 天外常绿")
 eq(expiryTone(30), "warn", "30 天内琥珀")

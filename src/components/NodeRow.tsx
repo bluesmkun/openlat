@@ -203,7 +203,7 @@ function NodeRowBase({ node, latency, onOpen }: { node: Node; latency?: Latency;
         <div className="hidden min-w-0 flex-col gap-1.5 xl:flex">
           <div className="flex items-center justify-between gap-2 leading-none">
             <span className="shrink-0 text-[10px] text-muted-foreground">到期</span>
-            <ExpiryText date={node.expires_at} compact className="min-w-0 truncate text-[10px] font-medium" />
+            <ExpiryText node={node} compact className="min-w-0 truncate text-[10px] font-medium" />
           </div>
           <div className="flex items-center justify-between gap-2 leading-none">
             <span className="shrink-0 text-[10px] text-muted-foreground">续费</span>

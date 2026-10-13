@@ -63,12 +63,22 @@ tar -czf theme.tar.gz dist theme.json preview.png
 
 | 接口 | 说明 |
 | --- | --- |
-| `GET /api/me` | 站点名、登录状态、公开页开关 |
+| `GET /api/me` | 站点名、登录状态、公开页开关、历史保留天数 |
 | `GET /api/nodes` | 节点列表、实时指标与累计流量 |
 | `GET /api/nodes/{id}/metrics` | 历史指标与延迟记录（`series=metrics\|ping`） |
-| `GET /api/ws` | 节点快照推送 |
+| `GET /api/ws` | 节点快照推送，浏览器支持 `DecompressionStream` 时带 `?gzip` 收压缩帧 |
 
-详情页路由：`/node/{id}`
+剩余天数用快照里的 `expires_in`、离线时长用 `last_seen_ago`（都由 hub 的时钟算出），
+旧版 hub 没有这两个字段时才退回 `expires_at` / `last_seen` 按浏览器时钟计算；
+详情页的时间范围按 `/api/me` 的 `history_days` 生成，不写死。
+
+## 路由
+
+- `/`：节点列表，卡片 / 列表两种视图
+- `/node/{id}`：节点详情
+
+详情页是客户端路由：从列表点进去只在前端切换，直接刷新 `/node/{id}` 才会真正请求这个路径。
+前面有按路径放行的反代或 WAF 时，把 `/node/` 加进放行名单，否则会出现「点进去正常、一刷新就被拦」。
 
 ## 技术栈
 
